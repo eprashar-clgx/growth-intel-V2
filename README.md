@@ -5,6 +5,7 @@ In the folder _bq queries_ two separate SQL files have been added: _base table_ 
 
 ### Must-have changes:
 Indicator logic from V2_indicators, which includes:
+
     * Land use:
         * Include if Year Built is NULL OR address is vacant (vacancy>0)
         * Exclude in all other cases
@@ -23,6 +24,9 @@ Indicator logic from V2_indicators, which includes:
 
 ### Good-to-have changes:
 In _base tables_ sql:
+
     * Exclude clips that do not have a polygon/multi-polygon geometry
+
     * Take the max value of COALESCED(year built, effective year built) instead of applying buildingseqnum = 1 logic
+    
     * Take COALESCE(COUNT(year built), COUNT(effective year built)) as number of structures
