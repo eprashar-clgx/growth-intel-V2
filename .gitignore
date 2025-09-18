@@ -1,0 +1,5 @@
+/data
+/eda_tmp
+/scripts
+/.env
+__pycache__/
