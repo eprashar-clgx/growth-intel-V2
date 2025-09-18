@@ -1,5 +1,7 @@
 -- Create base for Growth Intelligence V1 for analysis
-CREATE OR REPLACE TABLE work_eprashar.growth_intelligence_base_qgis AS
+--CREATE OR REPLACE TABLE work_eprashar.growth_intelligence_base_qgis AS
+-- TODO: Add YEAR BUILT here
+
 WITH GI AS (
   SELECT 
     puid,
@@ -18,6 +20,7 @@ WITH GI AS (
     new_clip_indicator
   FROM `clgx-idap-bigquery-prd-a990.edr_ent_property_enriched.vw_edr_panoramiq_growth_indicators`
 ),
+-- Not relevant for Venkat's final changes
 parcel_counts AS (
   SELECT
     clip,
@@ -27,6 +30,8 @@ parcel_counts AS (
 ),
 -- While panoramiq_growth_indicators doesn't have geometry,
 -- we can discuss if this logic can be leveraged to prioritize polygon / filter out point geometries
+-- Not relevant for Venkat's final changes
+-- Agreed to remove NULL geometries and point geometries from panoramiq_growth_indicators 
 parcel_geom AS (
   SELECT
     clip,
@@ -41,6 +46,7 @@ parcel_geom AS (
   )
   WHERE rn = 1
 ),
+-- Not relevant for Venkat's final changes
 sp_owners AS (
   SELECT  
     fips,  
@@ -51,6 +57,7 @@ sp_owners AS (
     ROUND(sumareabldg / landdimsqfttotal, 2) as blgd_land_ratio
   FROM `clgx-idap-bigquery-prd-a990.edr_ent_property_tax_assessor.property_v1`
 ),
+-- Not relevant for Venkat's final changes
 owner_classification AS (
   -- A name could have multiple classifications tagged to it 
   -- Even the same classification for the exact same name is done multiple times (example PULTE HOMES LLC) appears twice because two different people
@@ -75,17 +82,20 @@ owner_classification AS (
   )
   WHERE rn = 1
 ),
+-- Relevant: Yes because we need addr_vacant_ratio  
 sp_address AS (
   SELECT 
     clip, 
-    AVG(DELIVERY_POINT_OCCUPANCY) as addr_vacant_ratio,
+    AVG(DELIVERY_POINT_OCCUPANCY) as addr_vacant_ratio, -- Needed
     -- 2) Pick any one address for each clip
-    ANY_VALUE(STD_MATCH_ADDRESS_BASE) as std_address
+    ANY_VALUE(STD_MATCH_ADDRESS_BASE) as std_address -- Not needed
   FROM `clgx-idap-bigquery-prd-a990.edr_pmd_property_pipeline.edr_sdp_address_connect`
   GROUP BY clip  
 ),
 -- Check if num_structures already exists in schema
 -- If not, we can add COALESCE(COUNT(yybltactdt), COUNT(yyblteffdt)) AS num_structures
+-- Use Max year built instead of using WHERE bldgseqnum = 1 logic
+-- Year Built: COALESCE(MAX(yybltactdt), MAX(yyblteffdt)) AS year_built
 structure_info AS (
   SELECT
     puid,

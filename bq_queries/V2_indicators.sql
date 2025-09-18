@@ -96,6 +96,9 @@ NewClipV2 AS (
     END AS new_clip_indicator_V2
   FROM NewClipV1 
 )
+-- CTE 5: Add Recent Year Built Indicator 
+-- Remove bldgsqnum and use MAX year built instead
+
 -- The final SELECT statement reconstructs the table, adding all three new V2 columns
 SELECT
   -- Select all columns from the original base table
