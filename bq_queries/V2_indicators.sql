@@ -99,8 +99,10 @@ NewClipV2 AS (
 -- CTE 5: Add Recent Year Built Indicator 
 -- Remove bldgsqnum and use MAX year built instead
 
--- The final SELECT statement reconstructs the table, adding all three new V2 columns
-SELECT
+-- CTE 6: Add new columns
+WITH GI_V2 AS 
+(
+  SELECT
   -- Select all columns from the original base table
   base.*,
   
@@ -124,4 +126,14 @@ LEFT JOIN
   BuilDevelopV2 AS v_build ON base.puid = v_build.puid
 LEFT JOIN
   LandUseV2 AS v_land ON base.puid = v_land.puid
-LEFT JOIN NewClipV2 AS v_clip ON base.puid = v_clip.puid;
+LEFT JOIN NewClipV2 AS v_clip ON base.puid = v_clip.puid
+)
+-- Final Step: Determine Growth Stage based on new V2 indicators
+SELECT
+  *,
+  CASE
+      WHEN recent_new_construction_sale_indicator = 'Y' OR recent_yearbuilt_indicator = 'Y' THEN 'Recently Completed'
+      WHEN recent_new_con_bldg_permit_indicator_V2 = 'Y' THEN 'Ongoing Growth' -- old definition: AND with builder_developer_own_ind = 'Y'
+      WHEN land_use_change_indicator_V2 ='Y' or builder_developer_ownership_indicator_V2 ='Y' OR new_clip_indicator = 'Y' THEN 'Early Growth' 
+      END AS growth_stage_V2
+FROM GI_V2;
