@@ -62,23 +62,23 @@ flowchart TD
 
 ## 2. Rules
 
-| # | Rule | Problem it solves | Tag | POC impact | Status |
-|---|---|---|---|---|---|
-| R1 | Snapshot prep | Keep only valid, comparable records | v1 | n/a | Built |
-| R2 | Normalize district codes | Formatting-only differences (`PD` vs `P-D`) | v1/v2 | Up to ~27% of Orange CLIPs (`PD`→`P-D`, to be verified); other counties TBD | Built. **Open:** `RSTD*` vs `RESTRICTED*` prefixes |
-| R3 | District set per CLIP | Split-zoned parcels and multiple vendor `zid`s | v2 | ~1% of CLIPs have more than one row | Built |
-| R4 | CLIP match | Parcels in only one snapshot | v1 | National: 41.5M → 52.3M distinct CLIPs (mostly vendor coverage growth) | Built |
-| R5 | Parcel lineage | Rezoned and then subdivided parcels get new CLIPs | NEW | Unknown | **To build** (lineage product) |
-| R6 | Zoning coverage | Parcel in both snapshots but zoning blank in one | v2 | 0.07% (Maricopa), 0.42% (Gainesville), 0.20% (Orange) | Built. **Open:** annexation vs vendor coverage |
-| R7 | District set change | Gate: only district changes can be rezonings | v2 | Everything downstream | Built |
-| R8 | Code regime switch | The vendor or a jurisdiction swapped the whole zoning code | v2 | 62% of Orange | Built. **Open:** switched jurisdictions aren't measurable |
-| R9 | Rename/merge crosswalk | Jurisdiction renamed or merged districts | v2/v6b | 51% of Gainesville | Built |
-| R10 | Split-boundary handling | Sliver drop (noise) vs district added (partial rezone) | v2/v6b | 466 of 520 Orange needles were sliver drops | Draft |
-| R11 | City program | City-led remap into new districts | v6b | Mesa form-based remaps (DR2→T3N, RM2→T4N…), count TBD | **Draft, thresholds untested** |
-| R12 | kNN isolation | Separate single-parcel rezonings from neighborhood-wide changes | v6 | Maricopa 621 / Gainesville 64 / Orange 520 needles | **Thresholds via QA** |
-| R13 | Tract size | Developer tract vs mass change | v6 | Maricopa: 700 small-tract / 1,677 mass | **Thresholds via QA** |
-| R14 | Annexation flag | County → city move, a developer signal | v6 | ~28 candidates | **Open:** explicit county→city mapping |
-| R15 | Use class and direction | Up- vs downzone for QA and reporting | v2/v4 | All candidates | **Open:** transect codes misclassified |
+| # | Pipeline step | Rule | Problem it solves | Tag | POC impact | Implementation |
+|---|---|---|---|---|---|---|
+| R1 | Ingestion | Snapshot prep | Keep only valid, comparable records | v1 | n/a | • FIPS filter (`LPAD(fips_code,5,'0')`)<br/>• `clip IS NOT NULL`<br/>• drop `clgx_pmd_actionflag = 'D'` |
+| R2 | Cleaning | Normalize district codes | Formatting-only differences (`PD` vs `P-D`) | v1/v2 | Up to ~27% of Orange CLIPs (~118K CLIPs in `PD`, to be verified); other counties TBD<br/>*e.g. Orange `PD` → `P-D`* | • strip non-alphanumerics<br/>• uppercase<br/>• **TBD:** `RSTD*` vs `RESTRICTED*` prefixes |
+| R3 | Cleaning | District set per CLIP | Split-zoned parcels and multiple vendor `zid`s | v2 | ~1% of CLIPs have more than one row<br/>*e.g. `R1` (zid 55) + `C2` (zid 91) → `C2\|R1`* | • distinct normalized codes per CLIP<br/>• sorted and joined with a pipe (`\|`)<br/>• `zid` ignored |
+| R4 | Matching | CLIP match | Parcels in only one snapshot | v1 | National: 41.5M → 52.3M distinct CLIPs<br/>*e.g. vendor coverage grew from 487 to 629 counties* | • full outer join on `clip`<br/>• `presence` = BOTH / ADDED / REMOVED |
+| R5 | Matching | Parcel lineage | Rezoned and then subdivided parcels get new CLIPs | NEW | Unknown<br/>*e.g. an `AG` parent CLIP split into 40 new `RSL30` lots* (hypothetical) | • **TBD:** parent-CLIP lookup for ADDED CLIPs<br/>• **TBD:** compare parent PREV vs child CURR |
+| R6 | Filtering | Zoning coverage | Parcel in both snapshots but zoning blank in one | v2 | 0.07% (Maricopa), 0.42% (Gainesville), 0.20% (Orange)<br/>*e.g. Maricopa: 679 assigned (∅ → district), 527 dropped (district → ∅)* | • one side NULL → `ZONING_ASSIGNED` / `ZONING_DROPPED`<br/>• **TBD:** annexation vs vendor coverage |
+| R7 | Filtering | District set change | Gate: only district changes can be rezonings | v2 | Orange ≥62%, Gainesville ≥51%, Maricopa <1% of CLIPs pass<br/>*e.g. passes: `R1` → `PD`; stops: `R1` → `R1` with height 35 → 30* | • `prev_dset ≠ curr_dset` |
+| R8 | Noise classification | Code regime switch | The vendor or a jurisdiction swapped the whole zoning code | v2 | 62% of Orange (~267K CLIPs)<br/>*e.g. regulation "Orange Code 2050" → "Chapter 38 - ZONING", districts `T32` → `R1AC`* | • regulation name changed<br/>• ≥50% of the regulation's CLIPs changed district<br/>• ≥20 CLIPs in the regulation<br/>• **TBD:** handling for jurisdictions that aren't measurable |
+| R9 | Noise classification | Rename/merge crosswalk | Jurisdiction renamed or merged districts | v2/v6b | 51% of Gainesville (~18.5K CLIPs)<br/>*e.g. `RSF1`/`RSF2`/`RSF3`/`RSF4` → `SF`; split-zoned `PD\|RSF1` → `PD\|SF`* | • learned from single-district CLIPs per (county, regulation, district)<br/>• top target share ≥0.9<br/>• ≥20 CLIPs<br/>• map applied to each district in split-zoned sets *(drafted, not run)* |
+| R10 | Noise classification | Split-boundary handling | Split-zoned parcel lost a district (boundary noise) vs gained one (possible partial rezone) | v2/v6b | Split-boundary cases among needles: Orange 466 of 520, Maricopa 201 of 621, Gainesville 11 of 64<br/>*e.g. lost: `T43\|T52` → `T52`; gained: `CAN` → `CAN\|PD`* | • after set contained in before set (district lost) → `SLIVER_DROP` *(drafted, not run)*<br/>• before set contained in after set (district gained) → `is_partial_rezone` *(drafted, not run)*<br/>• **TBD:** gained district already on neighboring parcels → sliver (e.g. `RU43` → `RU190\|RU43`) |
+| R11 | Noise classification | City program | City-led remap into new districts | v6b | Mesa form-based remaps, total TBD<br/>*e.g. `DR2` → `T3N` (292), `RM2` → `T4N` (205), `DC` → `T6MS` (44)* | • target district new in CURR *(drafted, not run)*<br/>• or ≥4 source districts, ≥10 clusters (300 m), <50% from AG *(drafted, not run)*<br/>• **TBD:** run and tune thresholds |
+| R12 | Spatial scoring | kNN isolation | Separate single-parcel rezonings from neighborhood-wide changes | v6 | Maricopa 621 / Gainesville 64 / Orange 520 needles<br/>*e.g. Maricopa `AG` → `LI`, Gainesville `BUS` → `U8`, Orange `CAN` → `PD`* | • 20 nearest sites within 1 km<br/>• co-located sites (condos) excluded<br/>• ≤15% share the same transition → `NEEDLE_PARCEL`<br/>• **TBD:** thresholds via QA |
+| R13 | Spatial scoring | Tract size | Developer tract vs mass change | v6 | Maricopa: 700 small-tract / 1,677 mass<br/>*e.g. tract: `AG` → `RSL30` (42); mass: `PAD` → `R14` (304)* | • ≤50 same-transition CLIPs within 1 km → `SMALL_TRACT`<br/>• else `MASS_CHANGE`<br/>• **TBD:** threshold via QA |
+| R14 | Enrichment | Annexation flag | County → city move, a developer signal | v6 | ~28 candidates (Maricopa 24, Orange 4)<br/>*e.g. regulation "Maricopa County Zoning Ordinance" → city code* | • `prev_reg ≠ curr_reg` outside R8<br/>• **TBD:** explicit county→city mapping |
+| R15 | Enrichment | Use class and direction | Up- vs downzone for QA and reporting | v2/v4 | Maricopa rezonings: 395 up / 107 down / 1,338 use change / 784 unknown<br/>*e.g. `AG` → `RS7` = inferred upzone (AG → single-family)* | • keyword-based use class<br/>• measured intensity direction, otherwise inferred from use rank<br/>• **TBD:** fix transect codes misclassified as AG |
 
 ### R1. Snapshot prep `[v1]`
 - **What:** keep valid records from each snapshot.
