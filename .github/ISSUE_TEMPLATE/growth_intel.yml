@@ -1,0 +1,27 @@
+name: Growth Intel (legacy)
+description: Change to the legacy Growth Intelligence V2 indicators
+labels: [growth-intel]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: Which indicator / table is affected and why?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Task checklist
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: Acceptance criteria
+    validations:
+      required: true

@@ -1,4 +1,4 @@
--- Zoning change MVP: rules R1-R4, R6-R13 (see docs/zoning_POC.md)
+-- Zoning change MVP: rules R1-R4, R6-R13 (see zoning/docs/zoning_POC.md)
 -- Output: one row per CLIP whose zoning district changed, with its bucket and a growth-table flag
 DECLARE fips_list        ARRAY<STRING> DEFAULT ['04013', '12001'];  -- Maricopa AZ, Alachua FL
 DECLARE min_group_n      INT64   DEFAULT 20;    -- R8, R9

@@ -1,0 +1,27 @@
+name: Zoning
+description: Work on the zoning change indicator POC
+labels: [zoning]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What problem does this solve? Reference rule IDs (R1–R15) from zoning/docs/zoning_POC.md where relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Task checklist
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: Acceptance criteria (e.g. counties validated, doc updated)
+    validations:
+      required: true

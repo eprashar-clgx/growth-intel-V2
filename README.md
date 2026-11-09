@@ -1,32 +1,42 @@
 # growth-intel-V2
 
-**Quick note:**
-In the folder _bq queries_ two separate SQL files have been added: _base table_ and _V2 indicators_. This separation has been done to make the underlying logic simple to understand. For implementation purposes, the former can be used as a CTE in the latter script.
+BigQuery SQL and documentation for CoreLogic growth signals, organised into two independent streams of work.
 
-### Must-have changes:
-Indicator logic from V2_indicators, which includes:
+| Stream | Folder | Status | What it is |
+|---|---|---|---|
+| Growth Intelligence V2 | [`growth_intel/`](growth_intel/) | Legacy / maintenance | Base table + V2 indicator logic (land use, new CLIP, new construction permit, builder/developer) |
+| Zoning change indicator | [`zoning/`](zoning/) | Active POC | Detect developer-driven parcel rezonings from Gridics zoning snapshots |
 
-    * Land use:
-        * Include if Year Built is NULL OR address is vacant (vacancy>0)
-        * Exclude in all other cases
+```
+growth_intel/
+  README.md            indicator rules and requested changes
+  sql/                 base_table.sql, V2_indicators.sql
+zoning/
+  README.md            stream index
+  docs/zoning_POC.md   rule catalogue (R1–R15) and decision flow
+  sql/                 POC and MVP queries
+  sql/scratch/         throwaway / exploratory queries
+```
 
-    * New Clip
-        * Same as above (land use)
+## Contribution workflow
 
-    * New Construction Permit Indicator
-        * Same as above (land use) 
+All new work follows **issue → branch → PR → squash merge**:
 
-    * Builder Developer
-        * Exclude if property was sold 5+ years ago OR 
-        * Exclude if built more than 3 years ago and is occupied/not vacant
-        * Include in all other cases
+1. **Open an issue** using a template (Growth Intel / Zoning / Repo). Label it with its stream.
+2. **Branch from `main`** named `<issue#>-<short-slug>`, e.g. `12-zoning-sliver-rule`.
+3. **Commit** on the branch; reference the issue (`Refs #12`).
+4. **Open a PR** into `main` whose description contains `Closes #12`.
+5. **Squash merge** once the issue's "done when" criteria are met. The branch is deleted automatically and the issue closes.
 
+Never commit directly to `main`. Keep each PR scoped to one issue and one stream.
 
-### Good-to-have changes:
-In _base tables_ sql:
+With the GitHub CLI:
 
-    * Exclude clips that do not have a polygon/multi-polygon geometry
+```bash
+gh issue create --label zoning --title "..."          # 1
+git switch main && git pull && git switch -c 12-slug   # 2
+gh pr create --fill --body "Closes #12"                # 4
+gh pr merge --squash --delete-branch                   # 5
+```
 
-    * Take the max value of COALESCED(year built, effective year built) instead of applying buildingseqnum = 1 logic
-    
-    * Take COALESCE(COUNT(year built), COUNT(effective year built)) as number of structures
+Copilot CLI users can ask for the `issue-workflow` skill (`.github/skills/issue-workflow/`) to drive these steps.
