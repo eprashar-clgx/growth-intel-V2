@@ -11,6 +11,7 @@ Every change to this repo follows: **GitHub issue → branch → PR → squash m
 
 1. **Size the items.** One issue = one PR that can be reviewed in one sitting, has one clear "Done when", and can merge on its own. Merge items that share a source and change (e.g. two columns from the same join). Split items that touch different sources or rules.
 2. **Order them.** Note dependencies between items. If one item changes the table that others write to, say so in the issues and confirm the order with the user.
+   Also flag sub-issues that will edit the **same file** (e.g. several changes to one SQL script). They should run one after another, or each needs a rebase before merging. Sub-issues that touch different files can run in parallel.
 3. **Propose the grouping to the user and confirm before creating anything.**
 4. **Create a parent tracking issue** (title ends with `(tracking issue)`). Its body holds the batch Goal, a summary of the sub-issues and their order, and "Done when: all sub-issues closed".
 5. **Create each sub-issue** as in step 1, then link it to the parent:
@@ -37,14 +38,19 @@ gh issue create --title "<imperative summary>" --label <stream> --body "<body>"
 - Body must include **Goal**, **Scope** (task checklist), and **Done when** (acceptance criteria). Match the templates in `.github/ISSUE_TEMPLATE/`.
 - Confirm title/scope with the user before creating if the request is ambiguous.
 
-## 2. Branch
+## 2. Branch (one worktree + one session per issue)
+
+The root checkout stays on `main` and is used for planning. Each issue gets its own git worktree, a sibling folder on its own branch, so several issues can be in progress at once without interfering:
 
 ```bash
-git switch main && git pull --ff-only
-git switch -c <N>-<short-kebab-slug>
+git fetch origin
+git worktree add ../<repo>.worktrees/<N>-<slug> -b <N>-<slug> origin/main
 ```
 
-Abort and tell the user if the working tree is dirty with unrelated changes.
+- Work in that folder in a dedicated Copilot session named after the branch: `cd ../<repo>.worktrees/<N>-<slug> && copilot --name <N>-<slug>`; resume it later with `copilot --resume <N>-<slug>`. Inside the CLI, `/new worktree` does the same; the user's `worktreeBaseRef` setting makes it start from `origin/main`.
+- If the current session is already inside the issue's worktree, skip this step.
+- Never `git switch main` inside a worktree: `main` is checked out in the root folder, so git refuses.
+- Abort and tell the user if the working tree is dirty with unrelated changes.
 
 ## 3. Work
 
@@ -54,6 +60,12 @@ Abort and tell the user if the working tree is dirty with unrelated changes.
 - Commit in small logical steps; end messages with `Refs #<N>`.
 
 ## 4. Pull request
+
+If `main` moved since the branch was created (e.g. another sub-issue merged), rebase first and re-validate:
+
+```bash
+git fetch origin && git rebase origin/main
+```
 
 ```bash
 git push -u origin HEAD
@@ -67,11 +79,19 @@ PR body follows `.github/pull_request_template.md` and **must** contain `Closes 
 Only merge when the issue's "Done when" criteria are met and the user approves:
 
 ```bash
-gh pr merge <PR#> --squash --delete-branch
-git switch main && git pull --ff-only
+gh pr merge <PR#> --squash        # repo auto-deletes the remote branch
 ```
 
-Squash commit title: `<issue title> (#<PR#>)`. Verify the issue closed (`gh issue view <N>`).
+Then clean up from the **root checkout**, not from inside the worktree:
+
+```bash
+cd <root checkout>
+git worktree remove ../<repo>.worktrees/<N>-<slug>
+git branch -D <N>-<slug>          # -D: squash-merged branches aren't ancestors of main
+git pull --ff-only && git fetch --prune
+```
+
+Squash commit title: `<issue title> (#<PR#>)`. Verify the issue closed (`gh issue view <N>`). Tell the user that the issue's session can now be closed.
 
 ## Follow-ups
 
