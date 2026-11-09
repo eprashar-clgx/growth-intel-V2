@@ -5,6 +5,10 @@
 - `zoning/` — active zoning change POC. Rules are documented in `zoning/docs/zoning_POC.md` (R1–R15); SQL in `zoning/sql/`; exploratory queries in `zoning/sql/scratch/`.
 - Keep the two streams separate: a change should touch only one stream folder unless the issue says otherwise.
 
+## Vocabulary
+- `docs/glossary.md` is the shared domain vocabulary. Read it before writing docs, SQL comments, issues or PRs; use its canonical terms and exact code names, and never coin synonyms.
+- New or renamed concepts go into the glossary via the `domain-glossary` skill (`.github/skills/domain-glossary/SKILL.md`).
+
 ## SQL conventions
 - All queries are BigQuery Standard SQL scripts; parameters are `DECLARE`d at the top (e.g. `fips_list`).
 - FIPS codes are normalised with `LPAD(fips_code, 5, '0')`.

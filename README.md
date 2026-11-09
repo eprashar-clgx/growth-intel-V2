@@ -8,6 +8,8 @@ BigQuery SQL and documentation for CoreLogic growth signals, organised into two 
 | Zoning change indicator | [`zoning/`](zoning/) | Active POC | Detect developer-driven parcel rezonings from Gridics zoning snapshots |
 
 ```
+docs/
+  glossary.md          shared vocabulary and domain model (both streams)
 growth_intel/
   README.md            indicator rules and requested changes
   sql/                 base_table.sql, V2_indicators.sql
@@ -40,3 +42,11 @@ gh pr merge --squash --delete-branch                   # 5
 ```
 
 Copilot CLI users can ask for the `issue-workflow` skill (`.github/skills/issue-workflow/`) to drive these steps.
+
+## Vocabulary
+
+Use the terms in [`docs/glossary.md`](docs/glossary.md) consistently in code, docs, issues and chats. Copilot's `domain-glossary` skill adds new terms and checks files for non-canonical aliases:
+
+```bash
+python3 .github/skills/domain-glossary/lint_glossary.py
+```
