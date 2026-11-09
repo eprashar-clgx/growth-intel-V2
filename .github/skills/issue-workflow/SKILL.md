@@ -32,6 +32,7 @@ Abort and tell the user if the working tree is dirty with unrelated changes.
 
 - Stay inside the stream folder for the issue (`zoning/` or `growth_intel/`), unless the issue is labelled `repo`.
 - Zoning rule changes: tag SQL with the rule ID (`-- R10`) and update `zoning/docs/zoning_POC.md` in the same branch.
+- Use the vocabulary in `docs/glossary.md`; add new concepts there (see the `domain-glossary` skill) and lint changed files before opening the PR.
 - Commit in small logical steps; end messages with `Refs #<N>`.
 
 ## 4. Pull request
