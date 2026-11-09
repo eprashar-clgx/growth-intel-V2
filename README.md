@@ -24,6 +24,7 @@ zoning/
 
 All new work follows **issue → branch → PR → squash merge**:
 
+0. **Plan a batch** of related items as a parent *tracking issue* with one *sub-issue* per item. Size each sub-issue as one independently mergeable PR with one clear "Done when"; the parent closes when all sub-issues are done.
 1. **Open an issue** using a template (Growth Intel / Zoning / Repo). Label it with its stream.
 2. **Branch from `main`** named `<issue#>-<short-slug>`, e.g. `12-zoning-sliver-rule`.
 3. **Commit** on the branch; reference the issue (`Refs #12`).

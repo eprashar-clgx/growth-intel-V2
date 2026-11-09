@@ -1,11 +1,29 @@
 ---
 name: issue-workflow
-description: Issue → branch → PR → squash-merge workflow for this repo. Use when starting new work, picking up a GitHub issue, opening a PR, or merging into main.
+description: Plan → issue → branch → PR → squash-merge workflow for this repo. Use when planning a batch of work, starting new work, picking up a GitHub issue, opening a PR, or merging into main.
 ---
 
 # Issue workflow
 
 Every change to this repo follows: **GitHub issue → branch → PR → squash merge into `main`**. Use the `gh` CLI for all GitHub operations. Never commit directly to `main`.
+
+## 0. Plan a batch (when the user lists several work items)
+
+1. **Size the items.** One issue = one PR that can be reviewed in one sitting, has one clear "Done when", and can merge on its own. Merge items that share a source and change (e.g. two columns from the same join). Split items that touch different sources or rules.
+2. **Order them.** Note dependencies between items. If one item changes the table that others write to, say so in the issues and confirm the order with the user.
+3. **Propose the grouping to the user and confirm before creating anything.**
+4. **Create a parent tracking issue** (title ends with `(tracking issue)`). Its body holds the batch Goal, a summary of the sub-issues and their order, and "Done when: all sub-issues closed".
+5. **Create each sub-issue** as in step 1, then link it to the parent:
+
+   ```bash
+   id=$(gh api repos/{owner}/{repo}/issues/<child#> --jq .id)
+   gh api -X POST repos/{owner}/{repo}/issues/<parent#>/sub_issues -F sub_issue_id=$id
+   gh api repos/{owner}/{repo}/issues/<parent#>/sub_issues --jq '.[].number'   # verify
+   ```
+
+6. Each sub-issue then goes through steps 1–5 independently. Close the parent once all its sub-issues are closed.
+
+New domain terms mentioned in the items (data sources, flags, tables) belong in the sub-issue's scope as a glossary update.
 
 ## 1. Start: issue
 
