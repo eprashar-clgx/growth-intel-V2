@@ -1,5 +1,5 @@
 -- Zoning change MVP: rules R1-R4, R6-R13 (see zoning/docs/zoning_POC.md)
--- Output: one row per CLIP whose zoning district changed, with its change class, a growth table flag, and owner name + year built from parcel essentials
+-- Output: one row per CLIP whose zoning district changed, with its change class, a growth table flag, owner name + year built from parcel essentials, and the super parcel flag, ID and owner name
 DECLARE fips_list        ARRAY<STRING> DEFAULT ['04013', '12001'];  -- Maricopa AZ, Alachua FL
 DECLARE min_group_n      INT64   DEFAULT 20;    -- R8, R9
 DECLARE regime_chg_share FLOAT64 DEFAULT 0.5;   -- R8
