@@ -66,6 +66,7 @@ Options: `--no-code` (skip VS Code), `--no-copilot` (only create the worktree), 
 - Inside a session, switch with `/resume <branch>`. Sessions started with `start-issue` are named after their branch.
 - Sub-issues that edit the same file should run one after another, or be rebased onto `origin/main` before merging.
 - Durable decisions belong in the issue, PR, glossary or docs, not only in a session's chat history.
+- **Context brief:** when planning, the planning session writes a short Context section into each issue: files and line ranges to read, tables and joins, decisions already made, gotchas. The issue's session reads the brief first instead of re-reading every doc. Each PR's "Brief feedback" notes what the brief missed, so briefs improve over time.
 
 Copilot CLI users can ask for the `issue-workflow` skill (`.github/skills/issue-workflow/`) to drive these steps.
 

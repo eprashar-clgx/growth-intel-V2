@@ -75,7 +75,7 @@ if (( launch )); then
     run exec copilot --resume "$branch"
   else
     (( dry )) || [[ -z "$marker" ]] || touch "$marker"
-    run exec copilot --name "$branch" -i "Pick up issue #$n using the issue-workflow skill. This session is already in its worktree on branch $branch."
+    run exec copilot --name "$branch" -i "Pick up issue #$n using the issue-workflow skill. Read the issue's Context brief first and open only the files it lists; widen the search only if the brief falls short. This session is already in its worktree on branch $branch."
   fi
 else
   echo "Next: cd $wt && copilot --name $branch"
