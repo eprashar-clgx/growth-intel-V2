@@ -209,3 +209,11 @@ flowchart TD
 Land-use changes and new permits usually *follow* a rezoning. They can confirm needles after the fact but can't detect them in the same period.
 
 The MVP output also carries **owner name** (`owner_name`) and **year built** (`max_yr_built`) from parcel essentials, joined CLIP → parcel via `vw_clip_to_parcel` (one parcel per CLIP). They help QA development signals, e.g. a builder owner or a recent year built. They don't change any change class.
+
+It also carries the **super parcel** flag (`is_super_parcel`), its ID (`sp_id`) and the **super parcel owner name** (`sp_owner_name`), joined parcel → `vw_lkp_superparcels` → `vw_superparcels` (one `sp_id` per parcel). The base tables `lkp_superparcels` / `superparcels` repeat keys, so use the views. These columns don't change any change class either.
+
+**Super parcel impact on R12/R13 (assessment only).** A super parcel is same-owner parcels within 75 m, so an owner rezoning a whole assemblage gives several CLIPs the same transition within a few neighbours of each other. They count toward each other's `k_same_tr` (R12) and `n_same_tr_radius` (R13), which can push a single-owner change out of `NEEDLE_PARCEL` into `SMALL_TRACT`, or into `MASS_CHANGE` for very large assemblages. S4 in `zoning_change_mvp.sql` reports `zoning_change_class` × `is_super_parcel` per county. Any change to R12/R13 logic is a separate issue.
+
+  - **Findings (S4, MVP run for issue #8):** super parcel CLIPs are common in Maricopa AZ (1,394 of 3,285, 42%) and rare in Alachua FL (383 of 18,615, 2%, mostly `RENAME_OR_MERGE`). In Maricopa AZ they make up 30% of `NEEDLE_PARCEL`, 57% of `SMALL_TRACT` and 44% of `MASS_CHANGE`.
+  - Their mean `n_same_tr_radius` is only slightly higher than for other CLIPs in `SMALL_TRACT` (24.6 vs 20.2) and `MASS_CHANGE` (145.9 vs 139.8), and lower in `NEEDLE_PARCEL` (9.8 vs 14.2). So super parcels don't visibly inflate R13 counts. Their over-representation in `SMALL_TRACT` fits R13's intent (developer assemblages).
+  - **Open:** S4 can't show how many same-transition neighbours sit in the *same* super parcel. That needs a neighbour-level check on the `knn` step.

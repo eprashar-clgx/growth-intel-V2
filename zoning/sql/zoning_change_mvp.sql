@@ -1,5 +1,5 @@
 -- Zoning change MVP: rules R1-R4, R6-R13 (see zoning/docs/zoning_POC.md)
--- Output: one row per CLIP whose zoning district changed, with its change class, a growth table flag, and owner name + year built from parcel essentials
+-- Output: one row per CLIP whose zoning district changed, with its change class, a growth table flag, owner name + year built from parcel essentials, and the super parcel flag, ID and owner name
 DECLARE fips_list        ARRAY<STRING> DEFAULT ['04013', '12001'];  -- Maricopa AZ, Alachua FL
 DECLARE min_group_n      INT64   DEFAULT 20;    -- R8, R9
 DECLARE regime_chg_share FLOAT64 DEFAULT 0.5;   -- R8
@@ -232,7 +232,7 @@ FROM cand AS c
 LEFT JOIN k USING (clip)
 LEFT JOIN r USING (clip);
 
--- Final table: change class + growth table flag + parcel essentials attributes
+-- Final table: change class + growth table flag + parcel essentials attributes + super parcel
 CREATE OR REPLACE TABLE `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp` AS
 WITH growth AS (
   SELECT DISTINCT CAST(puid AS STRING) AS clip
@@ -255,6 +255,14 @@ pe AS (
   FROM `clgx-idap-bigquery-prd-a990.edr_ent_property_fulfillment_hist.parcel_essentials_dsf`
   WHERE parcel_shape_id IN (SELECT parcel_shape_id FROM c2p)
   GROUP BY 1
+),
+-- super parcel per parcel: use the vw_ views, which are one sp_id per parcel and one row per sp_id
+-- (the base lkp_superparcels / superparcels tables repeat keys)
+sp AS (
+  SELECT CAST(l.parcel_shape_id AS STRING) AS parcel_shape_id, l.sp_id, s.owner AS sp_owner_name
+  FROM `clgx-idap-bigquery-prd-a990.edr_ent_property_property_graph.vw_lkp_superparcels` AS l
+  LEFT JOIN `clgx-idap-bigquery-prd-a990.edr_ent_property_property_graph.vw_superparcels` AS s USING (sp_id)
+  WHERE CAST(l.parcel_shape_id AS STRING) IN (SELECT parcel_shape_id FROM c2p)
 )
 SELECT
   c.clip,
@@ -279,6 +287,9 @@ SELECT
   m.parcel_shape_id,
   pe.owner_name,
   pe.max_yr_built,
+  (sp.sp_id IS NOT NULL) AS is_super_parcel,
+  sp.sp_id,
+  sp.sp_owner_name,
   c.reg_n, c.reg_chg_share,
   p.tgt_is_new_district, p.tgt_n_src, p.tgt_n_places, p.tgt_rural_src_share,
   k.k_n, k.k_same_tr, k.k_same_tr_share, k.n_colocated, k.n_same_tr_radius,
@@ -289,7 +300,8 @@ LEFT JOIN prog   AS p USING (clip)
 LEFT JOIN knn    AS k USING (clip)
 LEFT JOIN growth AS g USING (clip)
 LEFT JOIN c2p    AS m USING (clip)
-LEFT JOIN pe          USING (parcel_shape_id);
+LEFT JOIN pe          USING (parcel_shape_id)
+LEFT JOIN sp          ON sp.parcel_shape_id = m.parcel_shape_id;
 
 -- S1: buckets x growth-table coverage
 SELECT
@@ -325,3 +337,17 @@ SELECT
 FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp`
 GROUP BY 1
 ORDER BY 1;
+
+-- S4: change class x super parcel (R12/R13 impact: do super parcels inflate n_same_tr_radius?)
+SELECT
+  county,
+  zoning_change_class,
+  COUNT(*)                                                   AS n_clips,
+  COUNTIF(is_super_parcel)                                   AS n_super_parcel,
+  ROUND(100 * COUNTIF(is_super_parcel) / COUNT(*), 1)        AS pct_super_parcel,
+  COUNT(DISTINCT sp_id)                                      AS n_distinct_sp,
+  ROUND(AVG(IF(is_super_parcel, n_same_tr_radius, NULL)), 1)     AS avg_same_tr_radius_sp,
+  ROUND(AVG(IF(NOT is_super_parcel, n_same_tr_radius, NULL)), 1) AS avg_same_tr_radius_non_sp
+FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp`
+GROUP BY 1, 2
+ORDER BY county, n_clips DESC;

@@ -23,6 +23,7 @@ erDiagram
   CHANGE_CLASS }o--|| OUTCOME_GROUP : "rolls up to"
   CLIP ||--o| GROWTH_RECORD : "puid = clip"
   CLIP }o--o| PARCEL : "vw_clip_to_parcel"
+  PARCEL }o--o| SUPER_PARCEL : "vw_lkp_superparcels"
   GROWTH_RECORD }o--|| GROWTH_STAGE : "derived from indicators"
 ```
 
@@ -58,6 +59,8 @@ erDiagram
 | **Parcel lineage** | The link from a child CLIP (created by a split) back to its parent CLIP. | | `lineage_parent_clip`, `is_split` *(planned)* | R5 |
 | **Parcel essentials** | Cotality's parcel-level attribute table; the source of owner name and year built in the zoning MVP. Mostly one row per parcel, so the MVP dedupes it on `parcel_shape_id`. | | `parcel_essentials_dsf` | zoning MVP |
 | **Owner name** | The parcel's primary owner name from parcel essentials. Condo CLIPs on one parcel share it. | | `owner_name` (from `ownr1fullname`) | zoning MVP |
+| **Super parcel** | An assemblage of parcels with the same owner, all within 75 m of each other, found by DBSCAN clustering in Cotality's property graph. Marketing documentation calls it **Parcel Link**; BigQuery tables use "super parcels". A parcel belongs to at most one super parcel. Not the same as several CLIPs on one parcel (`n_clips_on_parcel`). | | `is_super_parcel`, `sp_id`; `vw_lkp_superparcels` | zoning MVP |
+| **Super parcel owner name** | The super parcel's owner from `vw_superparcels`. Kept separate from **Owner name** (parcel essentials). | | `sp_owner_name` (from `owner`) | zoning MVP |
 
 ### Pipeline concepts
 
