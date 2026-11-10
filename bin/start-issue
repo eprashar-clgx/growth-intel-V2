@@ -25,8 +25,9 @@ done
 
 run() { if (( dry )); then echo "+ $*"; else "$@"; fi; }
 
-# Main checkout, even when called from inside another worktree
-root="$(cd "$(git rev-parse --path-format=absolute --git-common-dir)/.." && pwd)"
+# Main checkout, located from this script (follows symlinks), so it works from any folder or worktree
+here="$(dirname "$(readlink -f "$0")")"
+root="$(cd "$(git -C "$here" rev-parse --path-format=absolute --git-common-dir)/.." && pwd)"
 cd "$root"
 
 read -r state title < <(gh issue view "$n" --json state,title --jq '.state + " " + .title')
