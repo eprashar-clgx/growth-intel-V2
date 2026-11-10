@@ -24,6 +24,7 @@ SELECT
   z.zoning_change_class,
   z.is_growth_clip, z.is_partial_rezone, z.k_same_tr_share, z.n_same_tr_radius,
   z.owner_name, z.max_yr_built,
+  z.is_super_parcel, z.sp_id, z.sp_owner_name,
   COUNT(*) OVER (PARTITION BY c2p.parcel_shape_id) AS n_clips_on_parcel,
   STARTS_WITH(z.curr_dset, 'T') AS is_mesa_transect,
   pu.parcel_polygon AS geom,

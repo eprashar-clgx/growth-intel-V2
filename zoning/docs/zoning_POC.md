@@ -209,3 +209,7 @@ flowchart TD
 Land-use changes and new permits usually *follow* a rezoning. They can confirm needles after the fact but can't detect them in the same period.
 
 The MVP output also carries **owner name** (`owner_name`) and **year built** (`max_yr_built`) from parcel essentials, joined CLIP → parcel via `vw_clip_to_parcel` (one parcel per CLIP). They help QA development signals, e.g. a builder owner or a recent year built. They don't change any change class.
+
+It also carries the **super parcel** flag (`is_super_parcel`), its ID (`sp_id`) and the **super parcel owner name** (`sp_owner_name`), joined parcel → `vw_lkp_superparcels` → `vw_superparcels` (one `sp_id` per parcel). The base tables `lkp_superparcels` / `superparcels` repeat keys, so use the views. These columns don't change any change class either.
+
+**Super parcel impact on R12/R13 (assessment only).** A super parcel is same-owner parcels within 75 m, so an owner rezoning a whole assemblage gives several CLIPs the same transition within a few neighbours of each other. They count toward each other's `k_same_tr` (R12) and `n_same_tr_radius` (R13), which can push a single-owner change out of `NEEDLE_PARCEL` into `SMALL_TRACT`, or into `MASS_CHANGE` for very large assemblages. S4 in `zoning_change_mvp.sql` reports `zoning_change_class` × `is_super_parcel` per county. Any change to R12/R13 logic is a separate issue.
