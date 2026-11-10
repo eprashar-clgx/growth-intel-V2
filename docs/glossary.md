@@ -22,6 +22,7 @@ erDiagram
   TRANSITION ||--|| CHANGE_CLASS : "classified by R6-R13"
   CHANGE_CLASS }o--|| OUTCOME_GROUP : "rolls up to"
   CLIP ||--o| GROWTH_RECORD : "puid = clip"
+  CLIP }o--o| PARCEL : "vw_clip_to_parcel"
   GROWTH_RECORD }o--|| GROWTH_STAGE : "derived from indicators"
 ```
 
@@ -30,7 +31,7 @@ erDiagram
 | Term | Definition | Avoid | Code | Source |
 |---|---|---|---|---|
 | **CLIP** | Cotality's unique parcel identifier; the join key across all datasets. Write it in uppercase in prose. | `parcel ID`, `clip id` | `clip`; `puid` in growth tables | — |
-| **Parcel** | The real-world piece of land a CLIP identifies. Say "parcel" for the land and "CLIP" for the identifier or row. | | | — |
+| **Parcel** | The real-world piece of land a CLIP identifies. Say "parcel" for the land and "CLIP" for the identifier or row. A parcel can hold several CLIPs (condos); CLIP → parcel comes from `vw_clip_to_parcel`. | | `parcel_shape_id` | — |
 | **FIPS** | 5-digit county code, zero-padded. | `county code` | `fips` = `LPAD(fips_code, 5, '0')` | R1 |
 | **County** | Written as "<Name> <ST>", e.g. "Maricopa AZ". POC counties: Maricopa AZ (04013), Alachua FL (12001), Orange FL (12095). "Gainesville" is a city jurisdiction inside Alachua FL, not a county. | | `county` | zoning MVP |
 | **Growth table** | The PanoramiQ growth indicators view, one row per CLIP. | `growth-table` | `vw_edr_panoramiq_growth_indicators`, `…_v2`; `is_growth_clip` | growth_intel, zoning MVP |
@@ -55,6 +56,8 @@ erDiagram
 | **Presence** | Whether a CLIP appears in both snapshots or only one. | | `presence` = `BOTH` / `ADDED` / `REMOVED` | R4 |
 | **Coverage churn** | A CLIP in only one snapshot with no lineage parent. Counts as vendor coverage noise. | | | R4, R5 |
 | **Parcel lineage** | The link from a child CLIP (created by a split) back to its parent CLIP. | | `lineage_parent_clip`, `is_split` *(planned)* | R5 |
+| **Parcel essentials** | Cotality's parcel-level attribute table; the source of owner name and year built in the zoning MVP. Mostly one row per parcel, so the MVP dedupes it on `parcel_shape_id`. | | `parcel_essentials_dsf` | zoning MVP |
+| **Owner name** | The parcel's primary owner name from parcel essentials. Condo CLIPs on one parcel share it. | | `owner_name` (from `ownr1fullname`) | zoning MVP |
 
 ### Pipeline concepts
 
@@ -120,7 +123,7 @@ Change class → outcome group:
 | **New construction permit indicator** | A recent new-construction building permit exists. Feeds Ongoing Growth. | | `recent_new_con_bldg_permit_indicator`, `…_V2` | README |
 | **Recent year built indicator** | Year built is recent. Feeds Recently Completed. | | `recent_yearbuilt_indicator` | `base_table.sql` |
 | **Recent new construction sale indicator** | A recent sale of new construction exists. Feeds Recently Completed. | | `recent_new_construction_sale_indicator` | `base_table.sql` |
-| **Year built** | The latest actual year built, falling back to the latest effective year built. | | `max_yr_built` = `COALESCE(latest_year_built, latest_eff_year_built)` (from `yybltactdt`, `yyblteffdt`) | `base_table.sql` |
+| **Year built** | The latest actual year built, falling back to the latest effective year built. | | `max_yr_built` = `COALESCE(latest_year_built, latest_eff_year_built)` (from `yybltactdt`, `yyblteffdt`) | `base_table.sql`, zoning MVP (from parcel essentials) |
 | **Vacant** | The CLIP has vacant delivery points. **Occupied** = not vacant (ratio 0 or NULL). | | `addr_vacant_ratio > 0` | `base_table.sql` |
 | **Latest sale date** | The most recent recorded transaction for the CLIP. | | `max_transaction_date` (from `recordingdt`) | `V2_indicators.sql` |
 | **Number of structures** | Count of buildings on the CLIP. | | `num_structures` *(proposed)* | README |
