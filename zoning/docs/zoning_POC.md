@@ -207,3 +207,5 @@ flowchart TD
 
 ### QA signals (not rules)
 Land-use changes and new permits usually *follow* a rezoning. They can confirm needles after the fact but can't detect them in the same period.
+
+The MVP output also carries **owner name** (`owner_name`) and **year built** (`max_yr_built`) from parcel essentials, joined CLIP → parcel via `vw_clip_to_parcel` (one parcel per CLIP). They help QA development signals, e.g. a builder owner or a recent year built. They don't change any change class.

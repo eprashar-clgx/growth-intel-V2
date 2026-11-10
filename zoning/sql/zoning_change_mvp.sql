@@ -1,5 +1,5 @@
 -- Zoning change MVP: rules R1-R4, R6-R13 (see zoning/docs/zoning_POC.md)
--- Output: one row per CLIP whose zoning district changed, with its bucket and a growth-table flag
+-- Output: one row per CLIP whose zoning district changed, with its change class, a growth table flag, and owner name + year built from parcel essentials
 DECLARE fips_list        ARRAY<STRING> DEFAULT ['04013', '12001'];  -- Maricopa AZ, Alachua FL
 DECLARE min_group_n      INT64   DEFAULT 20;    -- R8, R9
 DECLARE regime_chg_share FLOAT64 DEFAULT 0.5;   -- R8
@@ -232,12 +232,29 @@ FROM cand AS c
 LEFT JOIN k USING (clip)
 LEFT JOIN r USING (clip);
 
--- Final table: bucket + growth-table flag
+-- Final table: change class + growth table flag + parcel essentials attributes
 CREATE OR REPLACE TABLE `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp` AS
 WITH growth AS (
   SELECT DISTINCT CAST(puid AS STRING) AS clip
   FROM `clgx-idap-bigquery-prd-a990.edr_ent_property_enriched.vw_edr_panoramiq_growth_indicators_v2`
   WHERE CAST(puid AS STRING) IN (SELECT clip FROM chg)
+),
+-- one parcel per CLIP; a parcel can hold several CLIPs (condos)
+c2p AS (
+  SELECT CAST(clip AS STRING) AS clip, MIN(CAST(parcel_shape_id AS STRING)) AS parcel_shape_id
+  FROM `clgx-idap-bigquery-prd-a990.edr_pmd_property_pipeline.vw_clip_to_parcel`
+  WHERE CAST(clip AS STRING) IN (SELECT clip FROM chg)
+  GROUP BY 1
+),
+-- parcel essentials can repeat a parcel_shape_id: dedupe to one row per parcel
+pe AS (
+  SELECT
+    parcel_shape_id,
+    ARRAY_AGG(ownr1fullname IGNORE NULLS ORDER BY src_record_update_date DESC, clip LIMIT 1)[SAFE_OFFSET(0)] AS owner_name,
+    COALESCE(MAX(YyBltActDt), MAX(YyBltEffDt)) AS max_yr_built
+  FROM `clgx-idap-bigquery-prd-a990.edr_ent_property_fulfillment_hist.parcel_essentials_dsf`
+  WHERE parcel_shape_id IN (SELECT parcel_shape_id FROM c2p)
+  GROUP BY 1
 )
 SELECT
   c.clip,
@@ -259,6 +276,9 @@ SELECT
   c.is_partial_rezone,
   c.is_reg_move,
   (g.clip IS NOT NULL) AS is_growth_clip,
+  m.parcel_shape_id,
+  pe.owner_name,
+  pe.max_yr_built,
   c.reg_n, c.reg_chg_share,
   p.tgt_is_new_district, p.tgt_n_src, p.tgt_n_places, p.tgt_rural_src_share,
   k.k_n, k.k_same_tr, k.k_same_tr_share, k.n_colocated, k.n_same_tr_radius,
@@ -267,7 +287,9 @@ SELECT
 FROM chg AS c
 LEFT JOIN prog   AS p USING (clip)
 LEFT JOIN knn    AS k USING (clip)
-LEFT JOIN growth AS g USING (clip);
+LEFT JOIN growth AS g USING (clip)
+LEFT JOIN c2p    AS m USING (clip)
+LEFT JOIN pe          USING (parcel_shape_id);
 
 -- S1: buckets x growth-table coverage
 SELECT
@@ -290,3 +312,16 @@ SELECT
 FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp`
 GROUP BY 1, 2
 ORDER BY county, n_clips DESC;
+
+-- S3: parcel essentials match rate (CLIP -> parcel -> owner name / year built)
+SELECT
+  county,
+  COUNT(*)                                  AS n_clips,
+  COUNT(DISTINCT clip)                      AS n_distinct_clips,
+  ROUND(100 * COUNTIF(parcel_shape_id IS NOT NULL) / COUNT(*), 1) AS pct_with_parcel,
+  ROUND(100 * COUNTIF(owner_name IS NOT NULL) / COUNT(*), 1)      AS pct_with_owner_name,
+  ROUND(100 * COUNTIF(max_yr_built IS NOT NULL) / COUNT(*), 1)    AS pct_with_yr_built,
+  COUNTIF(max_yr_built = 0)                 AS n_yr_built_zero
+FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp`
+GROUP BY 1
+ORDER BY 1;
