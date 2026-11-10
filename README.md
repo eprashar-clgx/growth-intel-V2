@@ -53,8 +53,17 @@ growth-intel-V2.worktrees/9-city-program/   branch 9-city-program: session "9-ci
 growth-intel-V2.worktrees/10-change-table/  branch 10-change-table: session "10-change-table"
 ```
 
-- Start a session in the worktree with `copilot --name <branch>`; come back to it with `copilot --resume <branch>`. Inside the CLI, `/new worktree` creates a worktree and session in one go.
-- Use one terminal tab and one VS Code window per worktree.
+Start or resume an issue with one command, one terminal tab per issue:
+
+```bash
+start-issue 7            # worktree + branch 7-<slug> from origin/main, VS Code window, Copilot session that picks up #7
+start-issue 7            # again later: reuses the worktree and resumes the session
+start-issue 7 owner-cols # custom slug → branch 7-owner-cols
+```
+
+Options: `--no-code` (skip VS Code), `--no-copilot` (only create the worktree), `--dry-run`. One-time install, so it works from any folder: `ln -s ~/growth-intel-V2/bin/start-issue ~/.local/bin/start-issue`. Without the install, run `bin/start-issue 7` from the repo.
+
+- Inside a session, switch with `/resume <branch>`. Sessions started with `start-issue` are named after their branch.
 - Sub-issues that edit the same file should run one after another, or be rebased onto `origin/main` before merging.
 - Durable decisions belong in the issue, PR, glossary or docs, not only in a session's chat history.
 

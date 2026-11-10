@@ -40,14 +40,16 @@ gh issue create --title "<imperative summary>" --label <stream> --body "<body>"
 
 ## 2. Branch (one worktree + one session per issue)
 
-The root checkout stays on `main` and is used for planning. Each issue gets its own git worktree, a sibling folder on its own branch, so several issues can be in progress at once without interfering:
+The root checkout stays on `main` and is used for planning. Each issue gets its own git worktree, a sibling folder on its own branch, so several issues can be in progress at once without interfering.
+
+The user normally starts an issue with `start-issue <N>` (`bin/start-issue`). It creates the worktree from `origin/main`, opens VS Code, and launches a session named `<N>-<slug>` that is already in the worktree. In that case, skip this step. To start an issue for the user from another session (e.g. the planning session), run `bin/start-issue <N> --no-code --no-copilot` from the repo and tell them to run `start-issue <N>`, which resumes it. The manual equivalent is:
 
 ```bash
 git fetch origin
 git worktree add ../<repo>.worktrees/<N>-<slug> -b <N>-<slug> origin/main
 ```
 
-- Work in that folder in a dedicated Copilot session named after the branch: `cd ../<repo>.worktrees/<N>-<slug> && copilot --name <N>-<slug>`; resume it later with `copilot --resume <N>-<slug>`. Inside the CLI, `/new worktree` does the same; the user's `worktreeBaseRef` setting makes it start from `origin/main`.
+- Work in that folder in a dedicated Copilot session named after the branch: `cd ../<repo>.worktrees/<N>-<slug> && copilot --name <N>-<slug>`; resume it later with `copilot --resume <N>-<slug>`.
 - If the current session is already inside the issue's worktree, skip this step.
 - Never `git switch main` inside a worktree: `main` is checked out in the root folder, so git refuses.
 - Abort and tell the user if the working tree is dirty with unrelated changes.
