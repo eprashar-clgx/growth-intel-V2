@@ -14,7 +14,7 @@ Every change to this repo follows: **GitHub issue → branch → PR → squash m
    Also flag sub-issues that will edit the **same file** (e.g. several changes to one SQL script). They should run one after another, or each needs a rebase before merging. Sub-issues that touch different files can run in parallel.
 3. **Propose the grouping to the user and confirm before creating anything.**
 4. **Create a parent tracking issue** (title ends with `(tracking issue)`). Its body holds the batch Goal, a summary of the sub-issues and their order, and "Done when: all sub-issues closed".
-5. **Create each sub-issue** as in step 1, then link it to the parent:
+5. **Create each sub-issue** as in step 1, including its **Context brief** (see below), then link it to the parent:
 
    ```bash
    id=$(gh api repos/{owner}/{repo}/issues/<child#> --jq .id)
@@ -26,6 +26,17 @@ Every change to this repo follows: **GitHub issue → branch → PR → squash m
 
 New domain terms mentioned in the items (data sources, flags, tables) belong in the sub-issue's scope as a glossary update.
 
+### Context brief
+
+The planning session has already read the docs and made decisions. A brief in each issue hands that over, so the issue's session doesn't start from scratch. Write it under a `### Context` heading in the issue body:
+
+- **Read first:** exact files and line ranges, and what the session can skip.
+- **Tables and joins:** source tables, keys, grain, and prior art in the repo.
+- **Decisions:** what's already settled with the user, and column and term names to use (from the glossary).
+- **Gotchas:** other issues that edit the same file, access limits, and **open questions** the session must ask the user before writing code.
+
+Point to files rather than copying them, and keep it short (around 20 lines). Only write down facts you checked in this session; label anything unverified as an open question. If a brief turns out to be wrong after the issue starts, edit the issue (`gh issue edit <N> --body-file …`) and tell the user to have the issue's session re-read it.
+
 ## 1. Start: issue
 
 If the user references an existing issue, read it with `gh issue view <N>`. Otherwise create one:
@@ -36,6 +47,7 @@ gh issue create --title "<imperative summary>" --label <stream> --body "<body>"
 
 - `<stream>` label: `zoning`, `growth-intel`, or `repo` (tooling/structure). One stream per issue.
 - Body must include **Goal**, **Scope** (task checklist), and **Done when** (acceptance criteria). Match the templates in `.github/ISSUE_TEMPLATE/`.
+- Add a **Context** brief (see step 0) whenever this session has context the next one would otherwise have to rediscover.
 - Confirm title/scope with the user before creating if the request is ambiguous.
 
 ## 2. Branch (one worktree + one session per issue)
@@ -56,6 +68,7 @@ git worktree add ../<repo>.worktrees/<N>-<slug> -b <N>-<slug> origin/main
 
 ## 3. Work
 
+- **Start from the brief.** Read the issue (`gh issue view <N>`) and its Context section first, then open only the files and line ranges it lists. Resolve its open questions with the user before writing code. Widen the search only when the brief falls short, and note any gap for the PR's "Brief feedback". If there's no brief, read `.github/copilot-instructions.md` and the stream's README first.
 - Stay inside the stream folder for the issue (`zoning/` or `growth_intel/`), unless the issue is labelled `repo`.
 - Zoning rule changes: tag SQL with the rule ID (`-- R10`) and update `zoning/docs/zoning_POC.md` in the same branch.
 - Use the vocabulary in `docs/glossary.md`; add new concepts there (see the `domain-glossary` skill) and lint changed files before opening the PR.
@@ -74,7 +87,7 @@ git push -u origin HEAD
 gh pr create --base main --title "<issue title>" --label <stream> --body "<body>"
 ```
 
-PR body follows `.github/pull_request_template.md` and **must** contain `Closes #<N>`. Summarise what changed, how it was validated (e.g. BigQuery run, row counts, counties checked), and any follow-ups.
+PR body follows `.github/pull_request_template.md` and **must** contain `Closes #<N>`. Summarise what changed, how it was validated (e.g. BigQuery run, row counts, counties checked), and any follow-ups. Under "Brief feedback", note what the issue's brief missed or got wrong, or "none".
 
 ## 5. Merge
 
