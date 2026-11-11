@@ -64,13 +64,13 @@ Only **rezoning candidates** (`stage1 = 'CANDIDATE'`, after R1–R10) go through
 ### Step 3. Change class, outcome group and score
 | Change pattern | Evidence? | Class | Outcome group | Score range | Typical |
 |---|---|---|---|---|---|
-| `ISOLATED` | not used | `NEEDLE_PARCEL` | Development signal | +1 to +5 | vacant or recent: +4 `HIGH`; unmatched: +2 `MEDIUM`; old: +1 `MEDIUM` |
+| `ISOLATED` | not used | `NEEDLE_PARCEL` | Development signal | +1 to +7 | vacant or recent: +4 `HIGH`; unmatched: +2 `MEDIUM`; old: +1 `MEDIUM` |
 | `TRACT` or `MIXED` | yes | `DEVELOPER_TRACT` | Development signal | 0 to +5 | vacant lot in a vacant subdivision: +4 `HIGH`; old lot in the patch: 0–1 `LOW` / `MEDIUM` |
 | `TRACT` | no | `MASS_CHANGE` | Government change | −1 to +3 | old: −1 `LOW`; vacant lot: +2 `MEDIUM` |
 | `MIXED` | no | `CITY_PROGRAM` | Government change | −1 to +3 | old: −1 `LOW`; vacant lot: +2 `MEDIUM` |
 | none (no coordinates) | none | `NO_COORDS` | none | −1 to +3 | mostly unmatched: 0 `LOW` |
 
-- **Score:** the sum of the points from steps 0–2, from −1 to +7. A needle whose patch has evidence can exceed +5, but that's rare.
+- **Score:** the sum of the points from steps 0–2, from −1 to +7. A needle whose patch has evidence can exceed +5: in the first MVP2 run (#29), 99 of 414 Maricopa AZ needles score +6 or +7.
 - **Tiers and use (for now):**
 
   | Tier | `growth_score` | Use |
@@ -271,16 +271,17 @@ One row per rezoning candidate, built in a temp table before the gates.
 | `qmi_n_same_tr` | Those of `qmi_n_cand` with the candidate's transition | `chg` | ¼ mile | No |
 | `qmi_cand_share` | **Candidate share:** `qmi_n_cand / qmi_n_sites`; 0 when `qmi_n_sites = 0` | derived | ¼ mile | No |
 | `qmi_same_tr_share` | **Same-transition share:** `qmi_n_same_tr / qmi_n_cand`; NULL when `qmi_n_cand = 0` | derived | ¼ mile | No |
-| `patch_id`, `patch_n` | Patch ID and its number of CLIPs, including the candidate | `chg` | patch | No |
-| `patch_top_owner_share` | **Top-owner share:** CLIPs held by the patch's most common patch owner / `patch_n`. NULL owners don't count | parcel essentials (`owner_name`) | patch | No (today's owner) |
-| `patch_top_sp_share` | **Top super parcel share:** CLIPs in the patch's most common `sp_id` / `patch_n` | `vw_lkp_superparcels` | patch | No (current super parcels) |
+| `patch_id`, `patch_n` | Patch ID (`<fips>:<curr_dset>:<cluster>`) and its number of CLIPs, including the candidate | `chg` | patch | No |
+| `patch_top_owner_share` | **Top-owner share:** CLIPs held by the patch's most common patch owner / `patch_n`. NULL owners don't count; 0 when no CLIP has an owner | parcel essentials (`owner_name`) | patch | No (today's owner) |
+| `patch_top_sp_share` | **Top super parcel share:** CLIPs in the patch's most common `sp_id` / `patch_n`. NULL `sp_id` doesn't count; 0 when no CLIP is in a super parcel | `vw_lkp_superparcels` | patch | No (current super parcels) |
 | `yb_status` | **Year-built status**, see below | parcel essentials (`max_yr_built`) | CLIP | Yes (PREV year) |
 | `patch_growth_yb_share` | Patch CLIPs with `yb_status` `NO_YEAR_BUILT` or `RECENT` / patch CLIPs with `yb_status ≠ 'UNMATCHED'`; NULL when none match | derived | patch | Yes |
 | `is_reg_move` | Existing: `prev_reg ≠ curr_reg` | `chg` | CLIP | Yes (both snapshots) |
 | `is_partial_rezone` | Existing (R10). Reported, no points | `chg` | CLIP | Yes (both snapshots) |
 
 **Year-built status (`yb_status`).** PREV is `gridics_zoning_archive_250903`, so `prev_snapshot_date = 2025-09-03` and the PREV year is 2025.
-- `UNMATCHED`: no parcel or no parcel essentials row for the CLIP. Today this is also a NULL `max_yr_built`, so #29 must keep it apart from `NO_YEAR_BUILT`.
+- `UNMATCHED`: no parcel or no parcel essentials row for the CLIP. Its `max_yr_built` is also NULL, so the lookups temp table (`lkp`) tests for the parcel essentials row, not for the year.
+- `yb_status` is set in `lkp` for every changed CLIP, but only rezoning candidates use it.
 - `NO_YEAR_BUILT`: the CLIP matched parcel essentials, but `max_yr_built` is NULL.
   - Treated as "no structure yet". Year built comes from county records, so expect false positives.
   - NULL can also be a missing year on a built parcel: up to 56% of a Mesa downtown patch is NULL among structures from the 1900s.
@@ -312,7 +313,7 @@ One row per rezoning candidate, built in a temp table before the gates.
     ELSE 'MIXED'
   END
   ```
-- **Points:** `ISOLATED` +2. `TRACT` and `MIXED` score 0: a same-transition tract alone isn't a growth signal, since developers and governments both produce one, and patch evidence and `yb_status` already tell them apart. `TRACT` vs `MIXED` only picks the government-change label (`MASS_CHANGE` vs `CITY_PROGRAM`), so the 50% cutoff can't swing the score. That matters because the cutoff sits in the middle of the data: in Maricopa AZ, 522 of 2,890 non-isolated candidates have a same-transition share of 0.4–0.6. The 5% isolation cutoff has no such crowding: no candidate has a candidate share between 0.03 and 0.08.
+- **Points:** `ISOLATED` +2. `TRACT` and `MIXED` score 0: a same-transition tract alone isn't a growth signal, since developers and governments both produce one, and patch evidence and `yb_status` already tell them apart. `TRACT` vs `MIXED` only picks the government-change label (`MASS_CHANGE` vs `CITY_PROGRAM`), so the 50% cutoff can't swing the score. That matters because the cutoff sits in the middle of the data: in Maricopa AZ, 517 of 2,641 non-isolated candidates with coordinates have a same-transition share of 0.4–0.6 (first MVP2 run, #29). The 5% isolation cutoff does swing the score (+2), and it isn't in a gap either: 141 Maricopa AZ candidates have a candidate share between 0.03 and 0.08, 65 of them between 0.05 and 0.06. Review it in #31.
 
 #### Growth evidence `[MVP2]`
 - **What:** decide whether a non-isolated change looks like a developer project or a government change.
@@ -357,6 +358,8 @@ END
 - **What:** a per-CLIP score and tier for every rezoning candidate, whatever its class.
 - **Why:** the class alone loses useful cases, e.g. a lot with no year built inside a Mesa remap (labelled true). With 72 labels from one county, additive points and tiers are easier to defend than a fitted model.
 - **Form:** additive points (`growth_score`, INT64) → tier (`growth_confidence`) → audit string (`growth_score_inputs`, e.g. `NO_YEAR_BUILT +2; owner +1; land +1`).
+  - The audit string lists only the inputs with non-zero points, labelled `<yb_status>`, `ISOLATED`, `owner`, `land` and `reg_move`, in that order; it is `(none)` when no input has points.
+  - Score, tier and audit string are NULL for CLIPs that aren't rezoning candidates.
 
 | Input | Points |
 |---|---|
@@ -370,13 +373,13 @@ END
 
 - **Tiers:** `HIGH` if `growth_score ≥ score_high_min` (3); `MEDIUM` if `≥ score_medium_min` (1); else `LOW`. Range −1 to +7.
 - **Tier use (for now):** `HIGH` counts as a growth parcel; `MEDIUM` and `LOW` both go to review.
-- **Hand check on the labels (Maricopa AZ, approximate until #29 builds the features):**
+- **Hand check on the labels (Maricopa AZ; all six reproduce in the first MVP2 run, #29, diagnostic S6):**
   - the 4 Mesa false positives (`OLD`, `MIXED`): −1, `LOW`;
   - `AG` → `RSL30` tract (no year built, `TRACT`, owner and land evidence): +4, `HIGH`;
   - `RS35` → `PS` needle (built 2024, `ISOLATED`): +4, `HIGH`;
   - `LC` → `RSL30` (no year built, `MIXED`, owner and land evidence from the `RSL30` patch): +4, `HIGH`;
   - lots with no year built inside the Mesa `T4NF` remap: +2, `MEDIUM`;
-  - an isolated rezoning on an old structure (`OLD`, `ISOLATED`): +1, `MEDIUM`. An isolated change alone is a growth signal; old structures keep it out of `HIGH`.
+  - an isolated rezoning on an old structure (`OLD`, `ISOLATED`): +1, `MEDIUM`. An isolated change alone is a growth signal; old structures keep it out of `HIGH`. In the first run, 119 of 155 Maricopa AZ isolated `OLD` CLIPs score +1; the rest add a regulation move or patch evidence (+2 or +3).
 - The weight of `NO_YEAR_BUILT` (+2) assumes it means "no structure"; county-sourced year built has errors, so this weight is an open item. Weights live in one `CASE` block; the tier cutoffs are `DECLARE`s.
 
 #### Neighborhood choice
@@ -424,7 +427,8 @@ MVP2 is a full script of its own and doesn't read MVP1's tables (#32). From MVP1
   - the features above;
   - `change_pattern`, `has_owner_evidence`, `has_land_evidence`;
   - `growth_score`, `growth_confidence`, `growth_score_inputs`;
-  - the `DECLARE`s above.
+  - the `DECLARE`s above;
+  - **Diagnostics:** S5 (features per county × change class), S6 (hand check on the 72 labels from #26, with the expected scores below), S6b (score per class, change pattern and `yb_status`) and S7 (R1–R10 match with `zoning_change_mvp1`, joined on `clip`).
 
 ### R14. Annexation flag `[v6]`
 - **What:** flag candidates whose governing regulation changed, for example from county to city code.
@@ -453,7 +457,6 @@ MVP2 joins **owner name** (`owner_name`) and **year built** (`max_yr_built`) fro
 It also joins the **super parcel** flag (`is_super_parcel`), its ID (`sp_id`) and the **super parcel owner name** (`sp_owner_name`), joined parcel → `vw_lkp_superparcels` → `vw_superparcels` (one `sp_id` per parcel). The base tables `lkp_superparcels` / `superparcels` repeat keys, so use the views. `sp_id` feeds `patch_top_sp_share`.
 
 ## 5. Open items
-- **#29:** keep `UNMATCHED` apart from `NO_YEAR_BUILT`.
 - **`NO_YEAR_BUILT` weight:** +2 for now. Year built is county-sourced, so some `NO_YEAR_BUILT` CLIPs will have a structure. Review the +2 once results are in (#31 / #33).
 - **Backlog (as we scale), #36:** owner as of PREV. `parcel_essentials_dsf` has only today's owner; an owner as of PREV can be sourced later and would replace `owner_name` as the patch owner.
 - **#31:** tune the thresholds and weights against the labels. The 72 labels are all Maricopa AZ and were partly chosen on year built, so don't over-fit to them. Alachua FL needs labels.
