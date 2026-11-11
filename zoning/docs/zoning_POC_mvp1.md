@@ -1,4 +1,6 @@
-# Zoning Change Indicator: POC notes
+# Zoning Change Indicator: POC notes (MVP1)
+
+> **Frozen.** This is the MVP1 design (`zoning_change_mvp1.sql`, frozen in #32): R1–R13, with R14 / R15 as enrichment. Only MVP1 bug fixes are documented here. The active design is MVP2: [`zoning_mvp2.md`](zoning_mvp2.md).
 
 **Goal:** find parcel rezonings that a developer probably pursued ("needles in the haystack"). Separate them from vendor and data noise, and from government or code-wide changes.
 

@@ -6,7 +6,7 @@ body:
     id: goal
     attributes:
       label: Goal
-      description: What problem does this solve? Reference rule IDs (R1–R15) from zoning/docs/zoning_POC.md where relevant.
+      description: What problem does this solve? Reference rule IDs (R1–R15) or growth-signal steps from zoning/docs/zoning_mvp2.md (MVP1: zoning/docs/zoning_POC_mvp1.md) where relevant.
     validations:
       required: true
   - type: textarea

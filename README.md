@@ -15,7 +15,8 @@ growth_intel/
   sql/                 base_table.sql, V2_indicators.sql
 zoning/
   README.md            stream index
-  docs/zoning_POC.md   rule catalogue (R1–R15) and decision flow
+  docs/zoning_mvp2.md  MVP2 design: product rules, decision flow, rules (active)
+  docs/zoning_POC_mvp1.md  MVP1 rule catalogue (R1–R15), frozen
   sql/                 MVP1 queries (frozen)
   sql/scratch/         throwaway / exploratory queries
 ```

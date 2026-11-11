@@ -70,7 +70,7 @@ git worktree add ../<repo>.worktrees/<N>-<slug> -b <N>-<slug> origin/main
 
 - **Start from the brief.** Read the issue (`gh issue view <N>`) and its Context section first, then open only the files and line ranges it lists. Resolve its open questions with the user before writing code. Widen the search only when the brief falls short, and note any gap for the PR's "Brief feedback". If there's no brief, read `.github/copilot-instructions.md` and the stream's README first.
 - Stay inside the stream folder for the issue (`zoning/` or `growth_intel/`), unless the issue is labelled `repo`.
-- Zoning rule changes: tag SQL with the rule ID (`-- R10`) and update `zoning/docs/zoning_POC.md` in the same branch.
+- Zoning rule changes: tag SQL with the rule ID (`-- R10`) and update `zoning/docs/zoning_mvp2.md` (or `zoning/docs/zoning_POC_mvp1.md` for an MVP1 bug fix) in the same branch.
 - Use the vocabulary in `docs/glossary.md`; add new concepts there (see the `domain-glossary` skill) and lint changed files before opening the PR.
 - Commit in small logical steps; end messages with `Refs #<N>`.
 
