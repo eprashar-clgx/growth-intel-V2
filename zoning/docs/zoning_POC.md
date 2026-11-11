@@ -113,7 +113,7 @@ flowchart TD
 | R12 | Spatial scoring | kNN isolation (MVP1) | Separate single-parcel rezonings from neighborhood-wide changes | v6 · MVP1 | Maricopa 621 / Gainesville 64 / Orange 520 needles<br/>*e.g. Maricopa `AG` → `LI`, Gainesville `BUS` → `U8`, Orange `CAN` → `PD`* | • 20 nearest sites within 1 km<br/>• co-located sites (condos) excluded<br/>• ≤15% share the same transition → `NEEDLE_PARCEL`<br/>• **TBD:** thresholds via QA |
 | R13 | Spatial scoring | Tract size (MVP1) | Developer tract vs mass change | v6 · MVP1 | Maricopa: 700 small-tract / 1,677 mass<br/>*e.g. tract: `AG` → `RSL30` (42); mass: `PAD` → `R14` (304)* | • ≤50 same-transition CLIPs within 1 km → `SMALL_TRACT`<br/>• else `MASS_CHANGE`<br/>• **TBD:** threshold via QA |
 | — | Growth signal | Change pattern (MVP2) | Is the rezoning isolated, part of a same-transition tract, or inside a mixed remap? Shares only, no code lists or fixed counts | MVP2 | Not run yet (#30)<br/>*e.g. Mesa `DC` → `T4N` among ~265 other rezoning candidates, 3% with the same transition → `MIXED`* | • ¼-mile neighborhood, co-located CLIPs excluded<br/>• `qmi_cand_share` ≤ 0.05 → `ISOLATED` → `NEEDLE_PARCEL`<br/>• else `qmi_same_tr_share` ≥ 0.5 → `TRACT`<br/>• else `MIXED` |
-| — | Growth signal | Growth evidence (MVP2) | Developer tract vs government change, from ownership and year built instead of tract size | MVP2 | Not run yet (#30)<br/>*e.g. `RS43` → `RSL30` (97 CLIPs, no year built) → `DEVELOPER_TRACT`; Mesa `RM2` → `T4N` (209 CLIPs, 189 owners, built 1915+) → `MASS_CHANGE`* | • per patch (same transition, linked within ¼ mile)<br/>• owner evidence: top owner or top super parcel ≥ 50% of the patch<br/>• land evidence: ≥ 75% with no year built or a recent year built<br/>• `TRACT` / `MIXED` with evidence → `DEVELOPER_TRACT`; without → `MASS_CHANGE` / `CITY_PROGRAM` |
+| — | Growth signal | Growth evidence (MVP2) | Developer tract vs government change, from ownership and year built instead of tract size | MVP2 | Not run yet (#30)<br/>*e.g. `RS43` → `RSL30` (97 CLIPs, no year built) → `DEVELOPER_TRACT`; Mesa `RM2` → `T4N` (209 CLIPs, 189 owners, built 1915+) → `MASS_CHANGE`* | • per patch (same target district, linked within ¼ mile)<br/>• owner evidence: top owner or top super parcel ≥ 50% of the patch<br/>• land evidence: ≥ 75% with no year built or a recent year built<br/>• `TRACT` / `MIXED` with evidence → `DEVELOPER_TRACT`; without → `MASS_CHANGE` / `CITY_PROGRAM` |
 | — | Growth signal | Growth confidence score (MVP2) | Rank every rezoning candidate by growth evidence, not only the development signal classes | MVP2 | Not run yet (#30) | • additive points → `growth_score`<br/>• `growth_confidence` = `HIGH` (≥ 3) / `MEDIUM` (1–2) / `LOW` (≤ 0)<br/>• `growth_score_inputs` lists the points |
 | R14 | Enrichment | Annexation flag | County → city move, a developer signal | v6 | ~28 candidates (Maricopa 24, Orange 4)<br/>*e.g. regulation "Maricopa County Zoning Ordinance" → city code* | • `is_reg_move` = `prev_reg ≠ curr_reg` outside R8<br/>• MVP2: computed for every rezoning candidate; `is_reg_move` adds +1 to `growth_score`<br/>• **TBD:** explicit county→city mapping |
 | R15 | Enrichment | Use class and direction | Up- vs downzone for QA and reporting | v2/v4 | Maricopa rezonings: 395 up / 107 down / 1,338 use change / 784 unknown<br/>*e.g. `AG` → `RS7` = inferred upzone (AG → single-family)* | • keyword-based use class<br/>• measured intensity direction, otherwise inferred from use rank<br/>• not in the MVP1 SQL; MVP2: `intensity_direction` is reporting only, not a `growth_score` input<br/>• **TBD:** fix transect codes misclassified as AG |
@@ -255,10 +255,11 @@ One row per rezoning candidate, built in a temp table before the gates.
 - **Quarter-mile neighborhood:** all CLIPs within 402.336 m (`qmi_m`, ¼ mile) of the candidate.
   - **Site:** a CLIP in `j`, i.e. in both snapshots with zoning on both sides, changed or not.
   - **Co-located:** a CLIP within 1 m of the candidate, typically a condo on the same parcel. Co-located CLIPs are excluded from the `qmi_*` counts and shares, as in MVP1's R12.
-- **Patch:** rezoning candidates with coordinates and the same transition (`prev_dset`, `curr_dset`) that are linked within ¼ mile:
-  - `ST_CLUSTERDBSCAN(geog, qmi_m, 1) OVER (PARTITION BY fips, prev_dset, curr_dset)`;
+- **Patch:** rezoning candidates with coordinates and the same target district set (`curr_dset`) that are linked within ¼ mile, whatever their source district:
+  - `ST_CLUSTERDBSCAN(geog, qmi_m, 1) OVER (PARTITION BY fips, curr_dset)`;
+  - keyed on the target, not the full transition, so a subdivision whose lots came from different districts (e.g. `AG` → `RSL30` and `LC` → `RSL30`) forms one patch;
   - co-located CLIPs are included.
-- **Patch owner:** `COALESCE(owner_name_prev, owner_name)`.
+- **Patch owner:** today's owner (`owner_name`). Owner as of PREV would be better but isn't in `parcel_essentials_dsf`; see Backlog under Open items.
 
 | Feature | Definition | Source | Neighbor set | Needs PREV? |
 |---|---|---|---|---|
@@ -269,8 +270,7 @@ One row per rezoning candidate, built in a temp table before the gates.
 | `qmi_cand_share` | **Candidate share:** `qmi_n_cand / qmi_n_sites`; 0 when `qmi_n_sites = 0` | derived | ¼ mile | No |
 | `qmi_same_tr_share` | **Same-transition share:** `qmi_n_same_tr / qmi_n_cand`; NULL when `qmi_n_cand = 0` | derived | ¼ mile | No |
 | `patch_id`, `patch_n` | Patch ID and its number of CLIPs, including the candidate | `chg` | patch | No |
-| `owner_name_prev` | Owner name as of the PREV snapshot date. **Open for #29:** check that `parcel_essentials_dsf` history gives an owner as of PREV; if not, leave NULL | parcel essentials history | CLIP | Yes |
-| `patch_top_owner_share` | **Top-owner share:** CLIPs held by the patch's most common patch owner / `patch_n`. NULL owners don't count | parcel essentials | patch | Yes (via `owner_name_prev`) |
+| `patch_top_owner_share` | **Top-owner share:** CLIPs held by the patch's most common patch owner / `patch_n`. NULL owners don't count | parcel essentials (`owner_name`) | patch | No (today's owner) |
 | `patch_top_sp_share` | **Top super parcel share:** CLIPs in the patch's most common `sp_id` / `patch_n` | `vw_lkp_superparcels` | patch | No (current super parcels) |
 | `yb_status` | **Year-built status**, see below | parcel essentials (`max_yr_built`) | CLIP | Yes (PREV year) |
 | `patch_growth_yb_share` | Patch CLIPs with `yb_status` `NO_YEAR_BUILT` or `RECENT` / patch CLIPs with `yb_status ≠ 'UNMATCHED'`; NULL when none match | derived | patch | Yes |
@@ -280,9 +280,9 @@ One row per rezoning candidate, built in a temp table before the gates.
 **Year-built status (`yb_status`).** PREV is `gridics_zoning_archive_250903`, so `prev_snapshot_date = 2025-09-03` and the PREV year is 2025.
 - `UNMATCHED`: no parcel or no parcel essentials row for the CLIP. Today this is also a NULL `max_yr_built`, so #29 must keep it apart from `NO_YEAR_BUILT`.
 - `NO_YEAR_BUILT`: the CLIP matched parcel essentials, but `max_yr_built` is NULL.
-  - Assumed to mean "no structure yet", but this is **not verified**.
+  - Treated as "no structure yet". Year built comes from county records, so expect false positives.
   - NULL can also be a missing year on a built parcel: up to 56% of a Mesa downtown patch is NULL among structures from the 1900s.
-  - **Open for #29:** check it against a land-use or improvement field from parcel essentials.
+  - **Open:** review its +2 weight (see Open items).
   - Not the same as **Vacant** (`addr_vacant_ratio > 0`).
 - `RECENT`: `max_yr_built ≥ EXTRACT(YEAR FROM prev_snapshot_date) − recent_yb_years`, with `recent_yb_years` = 2, so 2023 or later.
   - This covers growth realised after the rezoning, e.g. Longbow 2024.
@@ -298,7 +298,8 @@ One row per rezoning candidate, built in a temp table before the gates.
   - the `DC` → `T4N` church (a false positive): 0.03.
   
   Isolated true positives, by contrast, mostly have few changed parcels nearby (0–11 within ¼ mile), whatever their share. Shares scale with density; fixed counts don't.
-- **Known miss:** `LC` → `RSL30` (labelled true) has 42 rezoning candidates within ¼ mile and none with its transition. It becomes `MIXED`, then `CITY_PROGRAM` (a single-CLIP patch has no patch evidence), with score +1 `MEDIUM`. #31 should check how common this is.
+- **Mixed sources, one subdivision:** `LC` → `RSL30` (labelled true) has 42 rezoning candidates within ¼ mile, all `AG` → `RSL30` (one builder, no year built), and none with its own transition. Its change pattern stays `MIXED`, but because patches are keyed on the target district it joins the 43-CLIP `RSL30` patch, gets owner and land evidence, and becomes `DEVELOPER_TRACT` (+3, `HIGH`).
+  - Keying the change pattern on the target district too was rejected: Mesa remaps send many source districts to the same transect district, so Maricopa AZ CLIPs with Mesa transect targets that count as `TRACT` would rise from 182 to 589, removing the `MIXED` penalty that catches the false positives.
 - **Algorithm (`change_pattern`):**
 
   ```sql
@@ -312,17 +313,20 @@ One row per rezoning candidate, built in a temp table before the gates.
 
 #### Growth evidence `[MVP2]`
 - **What:** decide whether a non-isolated change looks like a developer project or a government change.
-- **Why:** this replaces MVP1's R13 50-CLIP tract cap, which sent `RS43` → `RSL30` (97 CLIPs, a labelled true positive) to `MASS_CHANGE`. Patch-level checks on the dev MVP1 output (Maricopa AZ) show the split:
+- **Why:** this replaces MVP1's R13 50-CLIP tract cap, which sent `RS43` → `RSL30` (97 CLIPs, a labelled true positive) to `MASS_CHANGE`. Checks on same-transition patches in the dev MVP1 output (Maricopa AZ) show the split:
   - Developer patches have 82–100% no year built or recent year built, or one owner or super parcel holding most of the patch:
     - `PAD` → `R14` (Meritage, 0.83);
     - `AG` → `RS7` (0.99);
     - `AG` → `RSL30` (0.69).
   - Mesa transect patches have ≤ 56% no year built, a top-owner share ≤ 0.37, and structures from the 1900s.
+  - Keying patches on the target district instead (Maricopa AZ rezoning candidates):
+    - Mesa transect targets: CLIPs with land evidence 70 → 46, owner evidence 119 → 58 (bigger, more mixed patches);
+    - other targets: land evidence 1,180 → 1,188, owner evidence unchanged at 874.
 - **Algorithm:**
   - `has_owner_evidence = patch_n ≥ 2 AND (patch_top_owner_share ≥ owner_min_share OR patch_top_sp_share ≥ owner_min_share)`, with `owner_min_share` = 0.5.
   - `has_land_evidence = patch_n ≥ 2 AND patch_growth_yb_share ≥ land_min_share`, with `land_min_share` = 0.75.
   - A single-CLIP patch has no patch evidence: its top-owner share is trivially 1, and its year built is already scored per CLIP.
-  - Owner as of PREV matters because the current owner changes after homes sell: Landsea `RS43` → `RSL30` has a current top-owner share of 0.39 with 22 owners. One project can also use several names, which is why the super parcel share counts as well.
+  - The patch owner is today's owner, so owner evidence weakens after homes sell: Landsea `RS43` → `RSL30` has a current top-owner share of 0.39 with 22 owners. It still gets land evidence (97 CLIPs with no year built). One project can also use several names, which is why the super parcel share counts as well.
 
 #### Change class `[MVP2]`
 ```sql
@@ -354,20 +358,22 @@ END
 | Input | Points |
 |---|---|
 | `yb_status` | `NO_YEAR_BUILT` +2, `RECENT` +2, `OLD` −1, `UNMATCHED` 0 |
-| `change_pattern` | `ISOLATED` +1, `TRACT` +1, `MIXED` −1, NULL (`NO_COORDS`) 0 |
+| `change_pattern` | `ISOLATED` +2, `TRACT` +1, `MIXED` −1, NULL (`NO_COORDS`) 0 |
 | `has_owner_evidence` | +1 |
 | `has_land_evidence` | +1 |
 | `is_reg_move` | +1 |
 | `is_partial_rezone` | 0 (reported only) |
 | `intensity_direction` | 0 (reporting only; not in the MVP1 SQL) |
 
-- **Tiers:** `HIGH` if `growth_score ≥ score_high_min` (3); `MEDIUM` if `≥ score_medium_min` (1); else `LOW`. Range −2 to +6.
+- **Tiers:** `HIGH` if `growth_score ≥ score_high_min` (3); `MEDIUM` if `≥ score_medium_min` (1); else `LOW`. Range −2 to +7.
 - **Hand check on the labels (Maricopa AZ, approximate until #29 builds the features):**
   - the 4 Mesa false positives (`OLD`, `MIXED`): −2, `LOW`;
   - `AG` → `RSL30` tract (no year built, `TRACT`, owner and land evidence): +5, `HIGH`;
-  - `RS35` → `PS` needle (built 2024, `ISOLATED`): +3, `HIGH`;
-  - lots with no year built inside the Mesa `T4NF` remap: +1, `MEDIUM`.
-- The weight of `NO_YEAR_BUILT` (+2) assumes it means "no structure"; revisit it if #29 shows otherwise. Weights live in one `CASE` block; the tier cutoffs are `DECLARE`s.
+  - `RS35` → `PS` needle (built 2024, `ISOLATED`): +4, `HIGH`;
+  - `LC` → `RSL30` (no year built, `MIXED`, owner and land evidence from the `RSL30` patch): +3, `HIGH`;
+  - lots with no year built inside the Mesa `T4NF` remap: +1, `MEDIUM`;
+  - an isolated rezoning on an old structure (`OLD`, `ISOLATED`): +1, `MEDIUM`. An isolated change alone is a growth signal; old structures keep it out of `HIGH`.
+- The weight of `NO_YEAR_BUILT` (+2) assumes it means "no structure"; county-sourced year built has errors, so this weight is an open item. Weights live in one `CASE` block; the tier cutoffs are `DECLARE`s.
 
 #### Neighborhood choice
 - **Now: a fixed ¼ mile, with shares and patches.**
@@ -414,11 +420,12 @@ MVP2 is a full script of its own and doesn't read MVP1's tables (#32). From MVP1
   - the features above;
   - `change_pattern`, `has_owner_evidence`, `has_land_evidence`;
   - `growth_score`, `growth_confidence`, `growth_score_inputs`;
-  - the `DECLARE`s above;
-  - the parcel-essentials history lookup for `owner_name_prev`.
+  - the `DECLARE`s above.
 
 #### Open items
-- **#29:** owner as of PREV (`owner_name_prev`); verify that `NO_YEAR_BUILT` means "no structure"; keep `UNMATCHED` apart.
+- **#29:** keep `UNMATCHED` apart from `NO_YEAR_BUILT`.
+- **`NO_YEAR_BUILT` weight:** +2 for now. Year built is county-sourced, so some `NO_YEAR_BUILT` CLIPs will have a structure. Review the +2 once results are in (#31 / #33).
+- **Backlog (as we scale), #36:** owner as of PREV. `parcel_essentials_dsf` has only today's owner; an owner as of PREV can be sourced later and would replace `owner_name` as the patch owner.
 - **#31:** tune the thresholds and weights against the labels. The 72 labels are all Maricopa AZ and were partly chosen on year built, so don't over-fit to them. Alachua FL needs labels.
 - **#33:** compare MVP1 vs MVP2 classes and tiers per county.
 

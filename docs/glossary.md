@@ -20,7 +20,7 @@ erDiagram
   CLIP ||--|{ DISTRICT_SET : "one per snapshot"
   CLIP ||--o| TRANSITION : "PREV set to CURR set"
   TRANSITION ||--|| CHANGE_CLASS : "R6-R13 (MVP1) or R6-R10 + growth signal (MVP2)"
-  CLIP }o--o| PATCH : "same transition within quarter mile (MVP2)"
+  CLIP }o--o| PATCH : "same target district within quarter mile (MVP2)"
   CLIP ||--o| GROWTH_CONFIDENCE_SCORE : "MVP2"
   CHANGE_CLASS }o--|| OUTCOME_GROUP : "rolls up to"
   CLIP ||--o| GROWTH_RECORD : "puid = clip"
@@ -99,9 +99,8 @@ The steps that replace R11–R13 in MVP2 (`zoning_POC.md`, "MVP2: growth signal"
 | **Quarter-mile neighborhood** | All sites within 402.336 m (¼ mile) of a rezoning candidate, excluding co-located CLIPs. | | `qmi_m`; prefix `qmi_` | MVP2 features |
 | **Candidate share** | The share of sites in the quarter-mile neighborhood that are rezoning candidates (any transition). | | `qmi_cand_share` = `qmi_n_cand / qmi_n_sites` | MVP2 features |
 | **Same-transition share** | The share of rezoning candidates in the quarter-mile neighborhood with the candidate's transition. Not the same as MVP1's kNN isolation, whose denominator is all sites. | | `qmi_same_tr_share` = `qmi_n_same_tr / qmi_n_cand` | MVP2 features |
-| **Patch** | Rezoning candidates with the same transition that are linked within ¼ mile (DBSCAN, `minPts` 1). | | `patch_id`, `patch_n` | MVP2 features |
-| **Owner as of PREV** | The parcel's owner name at the PREV snapshot date, from parcel essentials history. *(planned, #29)* | | `owner_name_prev` | MVP2 features |
-| **Patch owner** | The owner used for patch ownership: owner as of PREV, falling back to owner name. | | `COALESCE(owner_name_prev, owner_name)` | MVP2 features |
+| **Patch** | Rezoning candidates with the same target district set (`curr_dset`), any source district, that are linked within ¼ mile (DBSCAN, `minPts` 1). | | `patch_id`, `patch_n` | MVP2 features |
+| **Patch owner** | The owner used for patch ownership: today's owner name. Owner as of PREV is a backlog item (#36). | | `owner_name` | MVP2 features |
 | **Top-owner share** | The share of a patch's CLIPs held by its most common patch owner. | | `patch_top_owner_share` | MVP2 features |
 | **Top super parcel share** | The share of a patch's CLIPs in its most common super parcel. | | `patch_top_sp_share` | MVP2 features |
 | **Year-built status** | A CLIP's year built relative to PREV: `NO_YEAR_BUILT` (matched, `max_yr_built` NULL), `RECENT` (≥ PREV year − `recent_yb_years`), `OLD`, or `UNMATCHED` (no parcel essentials row). `NO_YEAR_BUILT` is not the same as **Vacant**. | | `yb_status` | MVP2 features |
