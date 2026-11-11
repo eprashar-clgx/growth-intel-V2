@@ -303,7 +303,7 @@ LEFT JOIN c2p    AS m USING (clip)
 LEFT JOIN pe          USING (parcel_shape_id)
 LEFT JOIN sp          ON sp.parcel_shape_id = m.parcel_shape_id;
 
--- S1: buckets x growth-table coverage
+-- S1: change class x growth table coverage
 SELECT
   county,
   zoning_change_class,
@@ -315,7 +315,7 @@ FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp`
 GROUP BY 1, 2
 ORDER BY county, n_clips DESC;
 
--- S2: top transitions per bucket (sanity check)
+-- S2: top transitions per change class (sanity check)
 SELECT
   county,
   zoning_change_class,
@@ -351,3 +351,61 @@ SELECT
 FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp`
 GROUP BY 1, 2
 ORDER BY county, n_clips DESC;
+
+-- S5 (R11): per-target diagnostic. A target is (county, curr_reg, curr_dset); R11 stats are per target.
+-- Shows targets labelled CITY_PROGRAM, near misses (>= 3 source district sets) and the Mesa review targets.
+-- Literals mirror the R11 DECLAREs (prog_min_src 4, prog_max_rural 0.5) so this runs standalone.
+SELECT
+  county,
+  curr_reg,
+  curr_dset,
+  COUNT(*)                                           AS n_clips,
+  COUNTIF(geom IS NOT NULL)                          AS n_with_coords,
+  LOGICAL_OR(tgt_is_new_district)                    AS tgt_is_new_district,
+  MAX(tgt_n_src)                                     AS tgt_n_src,
+  MAX(tgt_n_places)                                  AS tgt_n_places,
+  ROUND(COUNTIF(geom IS NOT NULL) / MAX(tgt_n_places), 1) AS clips_per_place,
+  ROUND(MAX(tgt_rural_src_share), 2)                 AS tgt_rural_src_share,
+  ROUND(ST_AREA(ST_CONVEXHULL(ST_UNION_AGG(geom))) / 1e6, 2) AS hull_km2,
+  COALESCE(MAX(tgt_n_src) >= 4 AND MAX(tgt_n_places) >= 10 AND MAX(tgt_rural_src_share) < 0.5, FALSE) AS passes_wide_10,
+  COALESCE(MAX(tgt_n_src) >= 4 AND MAX(tgt_n_places) >= 25 AND MAX(tgt_rural_src_share) < 0.5, FALSE) AS passes_wide_25,
+  APPROX_TOP_COUNT(zoning_change_class, 6)           AS classes,
+  APPROX_TOP_COUNT(prev_dset, 6)                     AS top_src,
+  COUNT(DISTINCT owner_name)                         AS n_distinct_owner,
+  COUNT(DISTINCT sp_id)                              AS n_distinct_sp
+FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp`
+WHERE tgt_is_new_district IS NOT NULL  -- R11 input: stage1 = 'CANDIDATE'
+GROUP BY 1, 2, 3
+HAVING LOGICAL_OR(zoning_change_class = 'CITY_PROGRAM')
+  OR tgt_n_src >= 3  -- SELECT alias (= MAX(tgt_n_src)); HAVING resolves aliases first
+  OR (county = 'Maricopa AZ' AND curr_dset IN ('RM4', 'T4N', 'T4NF', 'T3N', 'T6MS'))
+ORDER BY county, tgt_n_places DESC, n_clips DESC;
+
+-- S6 (R11): sensitivity of CITY_PROGRAM to prog_min_places (other thresholds as declared)
+WITH t AS (
+  SELECT
+    county, curr_reg, curr_dset,
+    COUNT(*)                        AS n_clips,
+    LOGICAL_OR(tgt_is_new_district) AS is_new,
+    MAX(tgt_n_src)                  AS n_src,
+    MAX(tgt_n_places)               AS n_places,
+    MAX(tgt_rural_src_share)        AS rural_share
+  FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp`
+  WHERE tgt_is_new_district IS NOT NULL
+  GROUP BY 1, 2, 3
+),
+s AS (
+  SELECT t.*, min_places,
+    COALESCE(n_src >= 4 AND n_places >= min_places AND rural_share < 0.5, FALSE) AS is_wide
+  FROM t, UNNEST([10, 15, 20, 25, 30]) AS min_places
+)
+SELECT
+  county,
+  min_places AS prog_min_places,
+  COUNTIF(is_new OR is_wide)                 AS n_targets,
+  SUM(IF(is_new OR is_wide, n_clips, 0))     AS n_clips_city_program,
+  COUNTIF(is_wide AND NOT is_new)            AS n_targets_wide_only,
+  SUM(IF(is_wide AND NOT is_new, n_clips, 0)) AS n_clips_wide_only
+FROM s
+GROUP BY 1, 2
+ORDER BY 1, 2;
