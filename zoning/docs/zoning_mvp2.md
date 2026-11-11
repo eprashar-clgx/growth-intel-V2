@@ -456,8 +456,21 @@ MVP2 joins **owner name** (`owner_name`) and **year built** (`max_yr_built`) fro
 
 It also joins the **super parcel** flag (`is_super_parcel`), its ID (`sp_id`) and the **super parcel owner name** (`sp_owner_name`), joined parcel → `vw_lkp_superparcels` → `vw_superparcels` (one `sp_id` per parcel). The base tables `lkp_superparcels` / `superparcels` repeat keys, so use the views. `sp_id` feeds `patch_top_sp_share`.
 
+### MVP1 vs MVP2 comparison (#33)
+- **Scripts:**
+  - `zoning_change_compare.sql` → `zoning_change_compare`: a FULL OUTER JOIN of `zoning_change_mvp1` and `zoning_change_mvp2` on `clip`, all counties, dev tables only;
+  - `zoning_change_compare_parcels.sql` → `zoning_change_compare_parcels`: adds the parcel polygon for CARTO (Maricopa AZ, all changed CLIPs, needs prd). It is a map layer next to `zoning_change_mvp1_parcels`, not a replacement.
+- **Columns:** `in_mvp1` / `in_mvp2`; `zoning_change_class_mvp1` / `_mvp2`; `outcome_group_mvp1` / `_mvp2` (`NOISE` / `GOVERNMENT_CHANGE` / `DEVELOPMENT_SIGNAL`, NULL for `NO_COORDS`); `is_class_changed` (`SMALL_TRACT` counts as `DEVELOPER_TRACT`); `is_group_changed`; `is_parcel_mismatch`. Both flags are TRUE for a CLIP in only one version. Shared CLIP attributes come from MVP2.
+- **Key check (C1, first run 2026-11-11):** one row per CLIP in both versions; 0 CLIPs in only one version; 0 `fips`, `parcel_shape_id` or R1–R10 (`stage1`) differences. So the geometry is the same whichever version drives it, and every difference comes from R11–R13 vs the growth signal.
+- **Results (C2–C4):**
+  - Alachua FL: 8 of 28 rezoning candidates change class. 4 `CITY_PROGRAM` → `NEEDLE_PARCEL` (`CON`/`PS` → `SF`); 4 `NEEDLE_PARCEL` → `DEVELOPER_TRACT` (one `BUS` → `U8` patch).
+  - Maricopa AZ: 2,287 of 3,117 rezoning candidates change class, and 1,349 change outcome group.
+    - Government change → development signal (848): mostly `MASS_CHANGE` → `DEVELOPER_TRACT` (726, all `HIGH`; `PAD` → `R14` 305, `AG` → `RS7` 140, `AG` → `RM2` 135). These are the developer patches that MVP1's R13 tract cap sent to `MASS_CHANGE`.
+    - Development signal → government change (500): `SMALL_TRACT` → `CITY_PROGRAM` (307) and `NEEDLE_PARCEL` → `CITY_PROGRAM` (160), mostly Mesa transect remaps (`DC` → `T4MS`, `GC` → `T4NF`, `DB1` → `T4NF`). 188 of the 500 are still `MEDIUM`.
+    - `MASS_CHANGE` → `CITY_PROGRAM` (824, same outcome group): Mesa transect remaps (`DR2` → `T3N` 260, `DC` → `T5MSF` 124).
+
 ## 5. Open items
 - **`NO_YEAR_BUILT` weight:** +2 for now. Year built is county-sourced, so some `NO_YEAR_BUILT` CLIPs will have a structure. Review the +2 once results are in (#31 / #33).
 - **Backlog (as we scale), #36:** owner as of PREV. `parcel_essentials_dsf` has only today's owner; an owner as of PREV can be sourced later and would replace `owner_name` as the patch owner.
 - **#31:** tune the thresholds and weights against the labels. The 72 labels are all Maricopa AZ and were partly chosen on year built, so don't over-fit to them. Alachua FL needs labels.
-- **#33:** compare MVP1 vs MVP2 classes and tiers per county.
+- **MVP1 vs MVP2:** re-run `zoning_change_compare.sql` (and the parcels script) after any MVP2 re-run, e.g. new thresholds from #31.

@@ -116,7 +116,7 @@ The steps that replace R11–R13 in MVP2 (`zoning_mvp2.md`, "Growth signal (afte
 | Term | Definition | Avoid | Code | Source |
 |---|---|---|---|---|
 | **Change class** | The final per-CLIP label from the pipeline. | `bucket`, `buckets`, `change_class` | `zoning_change_class` | zoning MVP1 |
-| **Outcome group** | One of three roll-ups of change classes: **noise**, **government change**, **development signal**. | `cosmetic change`, `jurisdiction-wide`, `district-wide`, `area rezoning`, `code-wide change` | | `zoning_mvp2.md` §1 |
+| **Outcome group** | One of three roll-ups of change classes: **noise**, **government change**, **development signal**. | `cosmetic change`, `jurisdiction-wide`, `district-wide`, `area rezoning`, `code-wide change` | `outcome_group_mvp1`, `outcome_group_mvp2` = `NOISE` / `GOVERNMENT_CHANGE` / `DEVELOPMENT_SIGNAL` | `zoning_mvp2.md` §1 |
 | **Noise** | Outcome group: vendor or data artifacts. | | | `zoning_mvp2.md` §1 |
 | **Government change** | Outcome group: changes made by a government or applied code-wide. | | | `zoning_mvp2.md` §1 |
 | **Development signal** | Outcome group: rezonings a developer probably pursued; the product target. MVP1: `NEEDLE_PARCEL` + `SMALL_TRACT`. MVP2: `NEEDLE_PARCEL` + `DEVELOPER_TRACT`. | | | `zoning_mvp2.md` §1 |
@@ -139,6 +139,15 @@ Change class → outcome group:
 | `SMALL_TRACT` | R13 (MVP1 only) | Development signal |
 | `DEVELOPER_TRACT` | change pattern + growth evidence (MVP2 only) | Development signal |
 | `ZONING_ASSIGNED` / `ZONING_DROPPED` | R6 | Open item (v2 only, not grouped) |
+
+### MVP1 vs MVP2 comparison
+
+| Term | Definition | Avoid | Code | Source |
+|---|---|---|---|---|
+| **Version comparison** | One row per CLIP from a FULL OUTER JOIN of the MVP1 and MVP2 outputs on `clip`. | | `zoning_change_compare`, `zoning_change_compare_parcels`; `in_mvp1`, `in_mvp2` | `zoning_change_compare.sql` (#33) |
+| **Class changed** | MVP1 and MVP2 give the CLIP different change classes; `SMALL_TRACT` counts as `DEVELOPER_TRACT`. TRUE if the CLIP is in only one version. | | `is_class_changed` | `zoning_change_compare.sql` (#33) |
+| **Outcome group changed** | MVP1 and MVP2 put the CLIP in different outcome groups. TRUE if the CLIP is in only one version. | | `is_group_changed` | `zoning_change_compare.sql` (#33) |
+| **Parcel mismatch** | Both versions have the CLIP but map it to different `parcel_shape_id`s. | | `is_parcel_mismatch` | `zoning_change_compare.sql` (#33) |
 
 ## Growth Intel
 
