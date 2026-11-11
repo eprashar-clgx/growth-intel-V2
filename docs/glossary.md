@@ -19,7 +19,9 @@ erDiagram
   REGULATION }o--|| JURISDICTION : "adopted by"
   CLIP ||--|{ DISTRICT_SET : "one per snapshot"
   CLIP ||--o| TRANSITION : "PREV set to CURR set"
-  TRANSITION ||--|| CHANGE_CLASS : "classified by R6-R13"
+  TRANSITION ||--|| CHANGE_CLASS : "R6-R13 (MVP1) or R6-R10 + growth signal (MVP2)"
+  CLIP }o--o| PATCH : "same transition within quarter mile (MVP2)"
+  CLIP ||--o| GROWTH_CONFIDENCE_SCORE : "MVP2"
   CHANGE_CLASS }o--|| OUTCOME_GROUP : "rolls up to"
   CLIP ||--o| GROWTH_RECORD : "puid = clip"
   CLIP }o--o| PARCEL : "vw_clip_to_parcel"
@@ -75,16 +77,40 @@ erDiagram
 | **Rezoning candidate** | A district change that survived the noise filters R8–R10. | `REZONE_CANDIDATE`, `rezone candidate` | `stage1 = 'CANDIDATE'` | R8–R10 |
 | **Sliver** | A split-zoned CLIP lost a district at a boundary (CURR set ⊂ PREV set). Counts as noise. | | `SLIVER_DROP` | R10 |
 | **Partial rezoning** | A split-zoned CLIP gained a district (PREV set ⊂ CURR set). It continues through the pipeline. | | `is_partial_rezone` | R10 |
-| **City program** | A city-led remap into new districts that looks like scattered rezonings. | | `CITY_PROGRAM`; `is_city_program`, `tgt_is_new_district`, `tgt_n_src` | R11 |
-| **Places** | Distinct 300 m DBSCAN clusters that a target district was handed out in. | `tgt_n_clusters` | `tgt_n_places` | R11 |
-| **Rural source share** | The share of a target district's rezonings that came from AG/rural districts. | `tgt_ag_src_share` | `tgt_rural_src_share` | R11 |
-| **kNN isolation** | The share of a candidate's k nearest sites that made the same transition. Co-located sites (condos) are excluded. | `k20_same_tr` | `k_n`, `k_same_tr`, `k_same_tr_share`, `n_colocated` | R12 |
-| **Tract size** | The number of same-transition CLIPs within the search radius. | `n_same_tr_1km` | `n_same_tr_radius` | R13 |
+| **City program** | A city-led remap that looks like scattered rezonings. MVP1 (R11): a target district that is new or handed out widely. MVP2: a `MIXED` change pattern without growth evidence. | | `CITY_PROGRAM`; MVP1: `is_city_program`, `tgt_is_new_district`, `tgt_n_src` | R11 (MVP1), change class (MVP2) |
+| **Places** | Distinct 300 m DBSCAN clusters that a target district was handed out in. | `tgt_n_clusters` | `tgt_n_places` | R11 (MVP1) |
+| **Rural source share** | The share of a target district's rezonings that came from AG/rural districts. | `tgt_ag_src_share` | `tgt_rural_src_share` | R11 (MVP1) |
+| **kNN isolation** | The share of a candidate's k nearest sites that made the same transition. Co-located sites (condos) are excluded. | `k20_same_tr` | `k_n`, `k_same_tr`, `k_same_tr_share`, `n_colocated` | R12 (MVP1) |
+| **Tract size** | The number of same-transition CLIPs within the search radius. | `n_same_tr_1km` | `n_same_tr_radius` | R13 (MVP1) |
 | **Regulation move** | Observed: a CLIP's regulation differs between PREV and CURR. | | `is_reg_move` | R14 |
 | **Annexation** | Confirmed subset of regulation moves: county regulation → city regulation. Not yet implemented. | | `is_annexation` *(reserved)* | R14 |
 | **Use class** | A broad keyword-based use category for a district (CONS, AG, SF, MF, MU, COM, IND). | | `prev_use_class`, `curr_use_class` | R15 |
 | **Intensity direction** | Upzone / downzone / use change / unknown, measured from intensity values or inferred from use rank. | `up-zone`, `down-zone` | `intensity_direction` = `UPZONE` / `DOWNZONE` / `USE_CHANGE` / `UNKNOWN` | R15 |
 | **Rezoning** | A real change to a parcel's district made by its jurisdiction. Use "rezone" only as a verb. | | | — |
+
+### Growth signal (MVP2)
+
+The steps that replace R11–R13 in MVP2 (`zoning_POC.md`, "MVP2: growth signal"). They have no R-number and are named by what they compute.
+
+| Term | Definition | Avoid | Code | Source |
+|---|---|---|---|---|
+| **Site** | A CLIP in both snapshots with zoning on both sides (temp table `j`), changed or not. | | `qmi_n_sites` | R12, MVP2 features |
+| **Co-located** | A CLIP within 1 m of another, usually a condo on the same parcel. It is excluded from neighbor counts and shares. | | `n_colocated` (MVP1), `qmi_n_colocated` (MVP2) | R12, MVP2 features |
+| **Quarter-mile neighborhood** | All sites within 402.336 m (¼ mile) of a rezoning candidate, excluding co-located CLIPs. | | `qmi_m`; prefix `qmi_` | MVP2 features |
+| **Candidate share** | The share of sites in the quarter-mile neighborhood that are rezoning candidates (any transition). | | `qmi_cand_share` = `qmi_n_cand / qmi_n_sites` | MVP2 features |
+| **Same-transition share** | The share of rezoning candidates in the quarter-mile neighborhood with the candidate's transition. Not the same as MVP1's kNN isolation, whose denominator is all sites. | | `qmi_same_tr_share` = `qmi_n_same_tr / qmi_n_cand` | MVP2 features |
+| **Patch** | Rezoning candidates with the same transition that are linked within ¼ mile (DBSCAN, `minPts` 1). | | `patch_id`, `patch_n` | MVP2 features |
+| **Owner as of PREV** | The parcel's owner name at the PREV snapshot date, from parcel essentials history. *(planned, #29)* | | `owner_name_prev` | MVP2 features |
+| **Patch owner** | The owner used for patch ownership: owner as of PREV, falling back to owner name. | | `COALESCE(owner_name_prev, owner_name)` | MVP2 features |
+| **Top-owner share** | The share of a patch's CLIPs held by its most common patch owner. | | `patch_top_owner_share` | MVP2 features |
+| **Top super parcel share** | The share of a patch's CLIPs in its most common super parcel. | | `patch_top_sp_share` | MVP2 features |
+| **Year-built status** | A CLIP's year built relative to PREV: `NO_YEAR_BUILT` (matched, `max_yr_built` NULL), `RECENT` (≥ PREV year − `recent_yb_years`), `OLD`, or `UNMATCHED` (no parcel essentials row). `NO_YEAR_BUILT` is not the same as **Vacant**. | | `yb_status` | MVP2 features |
+| **Growth year-built share** | The share of a patch's matched CLIPs with `yb_status` `NO_YEAR_BUILT` or `RECENT`. | | `patch_growth_yb_share` | MVP2 features |
+| **Change pattern** | The shape of the change around a rezoning candidate: `ISOLATED` (low candidate share), `TRACT` (high same-transition share) or `MIXED`. | | `change_pattern` | MVP2 |
+| **Owner evidence** | A patch of 2+ CLIPs where one patch owner or one super parcel holds at least `owner_min_share`. | | `has_owner_evidence` | MVP2 growth evidence |
+| **Land evidence** | A patch of 2+ CLIPs whose growth year-built share is at least `land_min_share`. | | `has_land_evidence` | MVP2 growth evidence |
+| **Growth evidence** | Owner evidence or land evidence. It decides developer tract vs government change for `TRACT` and `MIXED` patterns. | | `has_owner_evidence OR has_land_evidence` | MVP2 |
+| **Growth confidence score** | Additive points per rezoning candidate from year-built status, change pattern, growth evidence and regulation move. They are reported as a tier and an audit string. Not related to the growth table or growth stage. | | `growth_score`; `growth_confidence` = `HIGH` / `MEDIUM` / `LOW`; `growth_score_inputs` | MVP2 |
 
 ### Change classes and outcome groups
 
@@ -94,23 +120,25 @@ erDiagram
 | **Outcome group** | One of three roll-ups of change classes: **noise**, **government change**, **development signal**. | `cosmetic change`, `jurisdiction-wide`, `district-wide`, `area rezoning`, `code-wide change` | | `zoning_POC.md` §1 |
 | **Noise** | Outcome group: vendor or data artifacts. | | | §1 |
 | **Government change** | Outcome group: changes made by a government or applied code-wide. | | | §1 |
-| **Development signal** | Outcome group: rezonings a developer probably pursued; the product target. Contains `NEEDLE_PARCEL` + `SMALL_TRACT`. | | | §1 |
-| **Needle** | Only an isolated single-parcel rezoning (`NEEDLE_PARCEL`). Not a synonym for development signal. | | `NEEDLE_PARCEL` | R12 |
-| **Small tract** | A developer-scale group of same-transition CLIPs. | | `SMALL_TRACT` | R13 |
-| **Mass change** | A same-transition change too large to be a developer tract. | | `MASS_CHANGE` | R13 |
+| **Development signal** | Outcome group: rezonings a developer probably pursued; the product target. MVP1: `NEEDLE_PARCEL` + `SMALL_TRACT`. MVP2: `NEEDLE_PARCEL` + `DEVELOPER_TRACT`. | | | §1 |
+| **Needle** | Only an isolated single-parcel rezoning (`NEEDLE_PARCEL`). Not a synonym for development signal. MVP1: kNN isolation; MVP2: `ISOLATED` change pattern. | | `NEEDLE_PARCEL` | R12 (MVP1), change pattern (MVP2) |
+| **Small tract** | MVP1: a developer-scale group of same-transition CLIPs (≤ `tract_max_clips`). MVP2's counterpart is **Developer tract**. | | `SMALL_TRACT` | R13 (MVP1) |
+| **Developer tract** | MVP2: a `TRACT` or `MIXED` change pattern with growth evidence. There is no size cap. | | `DEVELOPER_TRACT` | MVP2 |
+| **Mass change** | A same-transition change that isn't a developer tract. MVP1: more than `tract_max_clips` CLIPs. MVP2: a `TRACT` change pattern without growth evidence. | | `MASS_CHANGE` | R13 (MVP1), MVP2 |
 
 Change class → outcome group:
 
 | `zoning_change_class` | Rule | Outcome group |
 |---|---|---|
 | `SLIVER_DROP` | R10 | Noise |
-| `NO_COORDS` | — | Unscored (no geometry) |
+| `NO_COORDS` | — | Not grouped (no geometry). MVP2 still gives it a growth confidence score from CLIP-level inputs |
 | `CODE_REGIME_SWITCH` | R8 | Government change |
 | `RENAME_OR_MERGE` | R9 | Government change |
-| `CITY_PROGRAM` | R11 | Government change |
-| `MASS_CHANGE` | R13 | Government change |
-| `NEEDLE_PARCEL` | R12 | Development signal |
-| `SMALL_TRACT` | R13 | Development signal |
+| `CITY_PROGRAM` | R11 (MVP1); change pattern + growth evidence (MVP2) | Government change |
+| `MASS_CHANGE` | R13 (MVP1); change pattern + growth evidence (MVP2) | Government change |
+| `NEEDLE_PARCEL` | R12 (MVP1); change pattern (MVP2) | Development signal |
+| `SMALL_TRACT` | R13 (MVP1 only) | Development signal |
+| `DEVELOPER_TRACT` | change pattern + growth evidence (MVP2 only) | Development signal |
 | `ZONING_ASSIGNED` / `ZONING_DROPPED` | R6 | Open item (v2 only, not grouped) |
 
 ## Growth Intel
