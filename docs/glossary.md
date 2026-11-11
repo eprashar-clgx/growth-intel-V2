@@ -5,7 +5,7 @@ The shared vocabulary for this repo. Use these terms in chats, docs, SQL comment
 **Rules**
 - Use the **canonical term** exactly as written here. Don't coin synonyms.
 - Terms in the **Avoid** column are known aliases. Replace them, and check for them with `python3 .github/skills/domain-glossary/lint_glossary.py`.
-- The **Code** column gives the exact column, label or table name. Where SQL and prose disagree, the latest SQL (zoning MVP) wins.
+- The **Code** column gives the exact column, label or table name. Where SQL and prose disagree, the latest zoning SQL (currently MVP1) wins.
 - Add or change terms on a branch through the issue workflow, using the `domain-glossary` skill. When renaming a term, move the old name into **Avoid**.
 
 ## Domain model
@@ -34,10 +34,10 @@ erDiagram
 | **CLIP** | Cotality's unique parcel identifier; the join key across all datasets. Write it in uppercase in prose. | `parcel ID`, `clip id` | `clip`; `puid` in growth tables | — |
 | **Parcel** | The real-world piece of land a CLIP identifies. Say "parcel" for the land and "CLIP" for the identifier or row. A parcel can hold several CLIPs (condos); CLIP → parcel comes from `vw_clip_to_parcel`. | | `parcel_shape_id` | — |
 | **FIPS** | 5-digit county code, zero-padded. | `county code` | `fips` = `LPAD(fips_code, 5, '0')` | R1 |
-| **County** | Written as "<Name> <ST>", e.g. "Maricopa AZ". POC counties: Maricopa AZ (04013), Alachua FL (12001), Orange FL (12095). "Gainesville" is a city jurisdiction inside Alachua FL, not a county. | | `county` | zoning MVP |
-| **Growth table** | The PanoramiQ growth indicators view, one row per CLIP. | `growth-table` | `vw_edr_panoramiq_growth_indicators`, `…_v2`; `is_growth_clip` | growth_intel, zoning MVP |
+| **County** | Written as "<Name> <ST>", e.g. "Maricopa AZ". POC counties: Maricopa AZ (04013), Alachua FL (12001), Orange FL (12095). "Gainesville" is a city jurisdiction inside Alachua FL, not a county. | | `county` | zoning MVP1 |
+| **Growth table** | The PanoramiQ growth indicators view, one row per CLIP. | `growth-table` | `vw_edr_panoramiq_growth_indicators`, `…_v2`; `is_growth_clip` | growth_intel, zoning MVP1 |
 | **Growth Intelligence V1 / V2** | V1 = production indicator logic in the growth table; V2 = the revised logic proposed in `growth_intel/`. Uppercase **V**. | | suffix `_V2` | `growth_intel/` |
-| **Zoning POC version** | Iterations of the zoning work: v1, v2, v4, v6, v6b, MVP. Lowercase **v**, so it doesn't collide with Growth Intelligence V1/V2. | | rule `Tag` column | `zoning_POC.md` |
+| **Zoning POC version** | Iterations of the zoning work: v1, v2, v4, v6, v6b, then **MVP1** and **MVP2**. Lowercase **v** for POC iterations, so they don't collide with Growth Intelligence V1/V2. **MVP1** = rules R1–R4, R6–R13, frozen (bug fixes only). **MVP2** (#26) = R1–R10 plus growth-signal gates and a confidence score, built as a separate script. MVP1 and MVP2 are compared by joining their outputs on `clip`. MVP1/MVP2 are zoning versions, not Growth Intelligence V1/V2. | `MVP` | rule `Tag` column; `zoning_change_mvp1`, `zoning_change_mvp2` | `zoning_POC.md` |
 
 ## Zoning
 
@@ -57,10 +57,10 @@ erDiagram
 | **Presence** | Whether a CLIP appears in both snapshots or only one. | | `presence` = `BOTH` / `ADDED` / `REMOVED` | R4 |
 | **Coverage churn** | A CLIP in only one snapshot with no lineage parent. Counts as vendor coverage noise. | | | R4, R5 |
 | **Parcel lineage** | The link from a child CLIP (created by a split) back to its parent CLIP. | | `lineage_parent_clip`, `is_split` *(planned)* | R5 |
-| **Parcel essentials** | Cotality's parcel-level attribute table; the source of owner name and year built in the zoning MVP. Mostly one row per parcel, so the MVP dedupes it on `parcel_shape_id`. | | `parcel_essentials_dsf` | zoning MVP |
-| **Owner name** | The parcel's primary owner name from parcel essentials. Condo CLIPs on one parcel share it. | | `owner_name` (from `ownr1fullname`) | zoning MVP |
-| **Super parcel** | An assemblage of parcels with the same owner, all within 75 m of each other, found by DBSCAN clustering in Cotality's property graph. Marketing documentation calls it **Parcel Link**; BigQuery tables use "super parcels". A parcel belongs to at most one super parcel. Not the same as several CLIPs on one parcel (`n_clips_on_parcel`). | | `is_super_parcel`, `sp_id`; `vw_lkp_superparcels` | zoning MVP |
-| **Super parcel owner name** | The super parcel's owner from `vw_superparcels`. Kept separate from **Owner name** (parcel essentials). | | `sp_owner_name` (from `owner`) | zoning MVP |
+| **Parcel essentials** | Cotality's parcel-level attribute table; the source of owner name and year built in zoning MVP1. Mostly one row per parcel, so MVP1 dedupes it on `parcel_shape_id`. | | `parcel_essentials_dsf` | zoning MVP1 |
+| **Owner name** | The parcel's primary owner name from parcel essentials. Condo CLIPs on one parcel share it. | | `owner_name` (from `ownr1fullname`) | zoning MVP1 |
+| **Super parcel** | An assemblage of parcels with the same owner, all within 75 m of each other, found by DBSCAN clustering in Cotality's property graph. Marketing documentation calls it **Parcel Link**; BigQuery tables use "super parcels". A parcel belongs to at most one super parcel. Not the same as several CLIPs on one parcel (`n_clips_on_parcel`). | | `is_super_parcel`, `sp_id`; `vw_lkp_superparcels` | zoning MVP1 |
+| **Super parcel owner name** | The super parcel's owner from `vw_superparcels`. Kept separate from **Owner name** (parcel essentials). | | `sp_owner_name` (from `owner`) | zoning MVP1 |
 
 ### Pipeline concepts
 
@@ -90,7 +90,7 @@ erDiagram
 
 | Term | Definition | Avoid | Code | Source |
 |---|---|---|---|---|
-| **Change class** | The final per-CLIP label from the pipeline. | `bucket`, `buckets`, `change_class` | `zoning_change_class` | zoning MVP |
+| **Change class** | The final per-CLIP label from the pipeline. | `bucket`, `buckets`, `change_class` | `zoning_change_class` | zoning MVP1 |
 | **Outcome group** | One of three roll-ups of change classes: **noise**, **government change**, **development signal**. | `cosmetic change`, `jurisdiction-wide`, `district-wide`, `area rezoning`, `code-wide change` | | `zoning_POC.md` §1 |
 | **Noise** | Outcome group: vendor or data artifacts. | | | §1 |
 | **Government change** | Outcome group: changes made by a government or applied code-wide. | | | §1 |
@@ -126,7 +126,7 @@ Change class → outcome group:
 | **New construction permit indicator** | A recent new-construction building permit exists. Feeds Ongoing Growth. | | `recent_new_con_bldg_permit_indicator`, `…_V2` | README |
 | **Recent year built indicator** | Year built is recent. Feeds Recently Completed. | | `recent_yearbuilt_indicator` | `base_table.sql` |
 | **Recent new construction sale indicator** | A recent sale of new construction exists. Feeds Recently Completed. | | `recent_new_construction_sale_indicator` | `base_table.sql` |
-| **Year built** | The latest actual year built, falling back to the latest effective year built. | | `max_yr_built` = `COALESCE(latest_year_built, latest_eff_year_built)` (from `yybltactdt`, `yyblteffdt`) | `base_table.sql`, zoning MVP (from parcel essentials) |
+| **Year built** | The latest actual year built, falling back to the latest effective year built. | | `max_yr_built` = `COALESCE(latest_year_built, latest_eff_year_built)` (from `yybltactdt`, `yyblteffdt`) | `base_table.sql`, zoning MVP1 (from parcel essentials) |
 | **Vacant** | The CLIP has vacant delivery points. **Occupied** = not vacant (ratio 0 or NULL). | | `addr_vacant_ratio > 0` | `base_table.sql` |
 | **Latest sale date** | The most recent recorded transaction for the CLIP. | | `max_transaction_date` (from `recordingdt`) | `V2_indicators.sql` |
 | **Number of structures** | Count of buildings on the CLIP. | | `num_structures` *(proposed)* | README |

@@ -1,4 +1,5 @@
--- Zoning change MVP: rules R1-R4, R6-R13 (see zoning/docs/zoning_POC.md)
+-- Zoning change MVP1: rules R1-R4, R6-R13 (see zoning/docs/zoning_POC.md)
+-- FROZEN: no further logic changes. Bug fixes only, each via its own issue. MVP2 (#26) is a separate script; compare by joining outputs on clip (#33).
 -- Output: one row per CLIP whose zoning district changed, with its change class, a growth table flag, owner name + year built from parcel essentials, and the super parcel flag, ID and owner name
 DECLARE fips_list        ARRAY<STRING> DEFAULT ['04013', '12001'];  -- Maricopa AZ, Alachua FL
 DECLARE min_group_n      INT64   DEFAULT 20;    -- R8, R9
@@ -233,7 +234,7 @@ LEFT JOIN k USING (clip)
 LEFT JOIN r USING (clip);
 
 -- Final table: change class + growth table flag + parcel essentials attributes + super parcel
-CREATE OR REPLACE TABLE `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp` AS
+CREATE OR REPLACE TABLE `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp1` AS
 WITH growth AS (
   SELECT DISTINCT CAST(puid AS STRING) AS clip
   FROM `clgx-idap-bigquery-prd-a990.edr_ent_property_enriched.vw_edr_panoramiq_growth_indicators_v2`
@@ -311,7 +312,7 @@ SELECT
   COUNTIF(is_growth_clip) AS n_in_growth,
   COUNTIF(NOT is_growth_clip) AS n_not_in_growth,
   ROUND(100 * COUNTIF(is_growth_clip) / COUNT(*), 1) AS pct_in_growth
-FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp`
+FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp1`
 GROUP BY 1, 2
 ORDER BY county, n_clips DESC;
 
@@ -321,7 +322,7 @@ SELECT
   zoning_change_class,
   COUNT(*) AS n_clips,
   APPROX_TOP_COUNT(transition, 5) AS top_transitions
-FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp`
+FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp1`
 GROUP BY 1, 2
 ORDER BY county, n_clips DESC;
 
@@ -334,7 +335,7 @@ SELECT
   ROUND(100 * COUNTIF(owner_name IS NOT NULL) / COUNT(*), 1)      AS pct_with_owner_name,
   ROUND(100 * COUNTIF(max_yr_built IS NOT NULL) / COUNT(*), 1)    AS pct_with_yr_built,
   COUNTIF(max_yr_built = 0)                 AS n_yr_built_zero
-FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp`
+FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp1`
 GROUP BY 1
 ORDER BY 1;
 
@@ -348,7 +349,7 @@ SELECT
   COUNT(DISTINCT sp_id)                                      AS n_distinct_sp,
   ROUND(AVG(IF(is_super_parcel, n_same_tr_radius, NULL)), 1)     AS avg_same_tr_radius_sp,
   ROUND(AVG(IF(NOT is_super_parcel, n_same_tr_radius, NULL)), 1) AS avg_same_tr_radius_non_sp
-FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp`
+FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp1`
 GROUP BY 1, 2
 ORDER BY county, n_clips DESC;
 
@@ -373,7 +374,7 @@ SELECT
   APPROX_TOP_COUNT(prev_dset, 6)                     AS top_src,
   COUNT(DISTINCT owner_name)                         AS n_distinct_owner,
   COUNT(DISTINCT sp_id)                              AS n_distinct_sp
-FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp`
+FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp1`
 WHERE tgt_is_new_district IS NOT NULL  -- R11 input: stage1 = 'CANDIDATE'
 GROUP BY 1, 2, 3
 HAVING LOGICAL_OR(zoning_change_class = 'CITY_PROGRAM')
@@ -390,7 +391,7 @@ WITH t AS (
     MAX(tgt_n_src)                  AS n_src,
     MAX(tgt_n_places)               AS n_places,
     MAX(tgt_rural_src_share)        AS rural_share
-  FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp`
+  FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp1`
   WHERE tgt_is_new_district IS NOT NULL
   GROUP BY 1, 2, 3
 ),

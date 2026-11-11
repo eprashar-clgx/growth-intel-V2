@@ -16,7 +16,7 @@ growth_intel/
 zoning/
   README.md            stream index
   docs/zoning_POC.md   rule catalogue (R1–R15) and decision flow
-  sql/                 POC and MVP queries
+  sql/                 MVP1 queries (frozen)
   sql/scratch/         throwaway / exploratory queries
 ```
 

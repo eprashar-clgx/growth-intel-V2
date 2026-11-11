@@ -1,9 +1,10 @@
--- Zoning change MVP -> parcel polygons for CARTO (Maricopa)
--- Run after zoning_change_mvp.sql
+-- Zoning change MVP1 -> parcel polygons for CARTO (Maricopa)
+-- FROZEN: no further logic changes (see zoning_change_mvp1.sql)
+-- Run after zoning_change_mvp1.sql
 -- If parcel_polygon is a STRING, wrap it in SAFE.ST_GEOGFROMTEXT(...) (or SAFE.ST_GEOGFROMGEOJSON for GeoJSON)
-CREATE OR REPLACE TABLE `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp_parcels` AS
+CREATE OR REPLACE TABLE `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp1_parcels` AS
 WITH z AS (
-  SELECT * EXCEPT (parcel_shape_id) FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp`
+  SELECT * EXCEPT (parcel_shape_id) FROM `clgx-gis-app-dev-06e3.work_eprashar.zoning_change_mvp1`
   WHERE county = 'Maricopa AZ'
     AND zoning_change_class IN ('NEEDLE_PARCEL','SMALL_TRACT','MASS_CHANGE','SLIVER_DROP','CITY_PROGRAM','NO_COORDS')
 ),
