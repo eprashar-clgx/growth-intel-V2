@@ -1,6 +1,6 @@
 # Zoning change indicator (POC)
 
-Finds parcel rezonings a developer probably pursued, separating them from vendor noise and government/code-wide changes. Full rule catalogue and decision flow: [`docs/zoning_POC.md`](docs/zoning_POC.md).
+Finds parcel rezonings a developer probably pursued, separating them from vendor noise and government/code-wide changes. Design, product rules and decision flow: [`docs/zoning_mvp2.md`](docs/zoning_mvp2.md) (MVP2, active). MVP1 rule catalogue (frozen): [`docs/zoning_POC_mvp1.md`](docs/zoning_POC_mvp1.md).
 
 ## SQL
 

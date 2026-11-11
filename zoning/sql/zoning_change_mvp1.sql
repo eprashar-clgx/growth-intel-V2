@@ -1,4 +1,4 @@
--- Zoning change MVP1: rules R1-R4, R6-R13 (see zoning/docs/zoning_POC.md)
+-- Zoning change MVP1: rules R1-R4, R6-R13 (see zoning/docs/zoning_POC_mvp1.md)
 -- FROZEN: no further logic changes. Bug fixes only, each via its own issue. MVP2 (#26) is a separate script; compare by joining outputs on clip (#33).
 -- Output: one row per CLIP whose zoning district changed, with its change class, a growth table flag, owner name + year built from parcel essentials, and the super parcel flag, ID and owner name
 DECLARE fips_list        ARRAY<STRING> DEFAULT ['04013', '12001'];  -- Maricopa AZ, Alachua FL

@@ -39,7 +39,7 @@ erDiagram
 | **County** | Written as "<Name> <ST>", e.g. "Maricopa AZ". POC counties: Maricopa AZ (04013), Alachua FL (12001), Orange FL (12095). "Gainesville" is a city jurisdiction inside Alachua FL, not a county. | | `county` | zoning MVP1 |
 | **Growth table** | The PanoramiQ growth indicators view, one row per CLIP. | `growth-table` | `vw_edr_panoramiq_growth_indicators`, `…_v2`; `is_growth_clip` | growth_intel, zoning MVP1 |
 | **Growth Intelligence V1 / V2** | V1 = production indicator logic in the growth table; V2 = the revised logic proposed in `growth_intel/`. Uppercase **V**. | | suffix `_V2` | `growth_intel/` |
-| **Zoning POC version** | Iterations of the zoning work: v1, v2, v4, v6, v6b, then **MVP1** and **MVP2**. Lowercase **v** for POC iterations, so they don't collide with Growth Intelligence V1/V2. **MVP1** = rules R1–R4, R6–R13, frozen (bug fixes only). **MVP2** (#26) = R1–R10 plus growth-signal gates and a confidence score, built as a separate script. MVP1 and MVP2 are compared by joining their outputs on `clip`. MVP1/MVP2 are zoning versions, not Growth Intelligence V1/V2. | `MVP` | rule `Tag` column; `zoning_change_mvp1`, `zoning_change_mvp2` | `zoning_POC.md` |
+| **Zoning POC version** | Iterations of the zoning work: v1, v2, v4, v6, v6b, then **MVP1** and **MVP2**. Lowercase **v** for POC iterations, so they don't collide with Growth Intelligence V1/V2. **MVP1** = rules R1–R4, R6–R13, frozen (bug fixes only). **MVP2** (#26) = R1–R10 plus growth-signal gates and a confidence score, built as a separate script. MVP1 and MVP2 are compared by joining their outputs on `clip`. MVP1/MVP2 are zoning versions, not Growth Intelligence V1/V2. | `MVP` | rule `Tag` column; `zoning_change_mvp1`, `zoning_change_mvp2` | `zoning_POC_mvp1.md`, `zoning_mvp2.md` |
 
 ## Zoning
 
@@ -90,7 +90,7 @@ erDiagram
 
 ### Growth signal (MVP2)
 
-The steps that replace R11–R13 in MVP2 (`zoning_POC.md`, "MVP2: growth signal"). They have no R-number and are named by what they compute.
+The steps that replace R11–R13 in MVP2 (`zoning_mvp2.md`, "Growth signal (after R10)"). They have no R-number and are named by what they compute.
 
 | Term | Definition | Avoid | Code | Source |
 |---|---|---|---|---|
@@ -109,17 +109,17 @@ The steps that replace R11–R13 in MVP2 (`zoning_POC.md`, "MVP2: growth signal"
 | **Owner evidence** | A patch of 2+ CLIPs where one patch owner or one super parcel holds at least `owner_min_share`. | | `has_owner_evidence` | MVP2 growth evidence |
 | **Land evidence** | A patch of 2+ CLIPs whose growth year-built share is at least `land_min_share`. | | `has_land_evidence` | MVP2 growth evidence |
 | **Growth evidence** | Owner evidence or land evidence. It decides developer tract vs government change for `TRACT` and `MIXED` patterns. | | `has_owner_evidence OR has_land_evidence` | MVP2 |
-| **Growth confidence score** | Additive points per rezoning candidate from year-built status, change pattern, growth evidence and regulation move. They are reported as a tier and an audit string. Not related to the growth table or growth stage. | | `growth_score`; `growth_confidence` = `HIGH` / `MEDIUM` / `LOW`; `growth_score_inputs` | MVP2 |
+| **Growth confidence score** | Additive points per rezoning candidate from year-built status, change pattern, growth evidence and regulation move. They are reported as a tier and an audit string. For now, `HIGH` counts as growth; `MEDIUM` and `LOW` go to review. Not related to the growth table or growth stage. | | `growth_score`; `growth_confidence` = `HIGH` / `MEDIUM` / `LOW`; `growth_score_inputs` | MVP2 |
 
 ### Change classes and outcome groups
 
 | Term | Definition | Avoid | Code | Source |
 |---|---|---|---|---|
 | **Change class** | The final per-CLIP label from the pipeline. | `bucket`, `buckets`, `change_class` | `zoning_change_class` | zoning MVP1 |
-| **Outcome group** | One of three roll-ups of change classes: **noise**, **government change**, **development signal**. | `cosmetic change`, `jurisdiction-wide`, `district-wide`, `area rezoning`, `code-wide change` | | `zoning_POC.md` §1 |
-| **Noise** | Outcome group: vendor or data artifacts. | | | §1 |
-| **Government change** | Outcome group: changes made by a government or applied code-wide. | | | §1 |
-| **Development signal** | Outcome group: rezonings a developer probably pursued; the product target. MVP1: `NEEDLE_PARCEL` + `SMALL_TRACT`. MVP2: `NEEDLE_PARCEL` + `DEVELOPER_TRACT`. | | | §1 |
+| **Outcome group** | One of three roll-ups of change classes: **noise**, **government change**, **development signal**. | `cosmetic change`, `jurisdiction-wide`, `district-wide`, `area rezoning`, `code-wide change` | | `zoning_mvp2.md` §1 |
+| **Noise** | Outcome group: vendor or data artifacts. | | | `zoning_mvp2.md` §1 |
+| **Government change** | Outcome group: changes made by a government or applied code-wide. | | | `zoning_mvp2.md` §1 |
+| **Development signal** | Outcome group: rezonings a developer probably pursued; the product target. MVP1: `NEEDLE_PARCEL` + `SMALL_TRACT`. MVP2: `NEEDLE_PARCEL` + `DEVELOPER_TRACT`. | | | `zoning_mvp2.md` §1 |
 | **Needle** | Only an isolated single-parcel rezoning (`NEEDLE_PARCEL`). Not a synonym for development signal. MVP1: kNN isolation; MVP2: `ISOLATED` change pattern. | | `NEEDLE_PARCEL` | R12 (MVP1), change pattern (MVP2) |
 | **Small tract** | MVP1: a developer-scale group of same-transition CLIPs (≤ `tract_max_clips`). MVP2's counterpart is **Developer tract**. | | `SMALL_TRACT` | R13 (MVP1) |
 | **Developer tract** | MVP2: a `TRACT` or `MIXED` change pattern with growth evidence. There is no size cap. | | `DEVELOPER_TRACT` | MVP2 |
