@@ -64,13 +64,13 @@ Only **rezoning candidates** (`stage1 = 'CANDIDATE'`, after R1–R10) go through
 ### Step 3. Change class, outcome group and score
 | Change pattern | Evidence? | Class | Outcome group | Score range | Typical |
 |---|---|---|---|---|---|
-| `ISOLATED` | not used | `NEEDLE_PARCEL` | Development signal | +1 to +5 | vacant or recent: +4 `HIGH`; unmatched: +2 `MEDIUM`; old: +1 `MEDIUM` |
+| `ISOLATED` | not used | `NEEDLE_PARCEL` | Development signal | +1 to +7 | vacant or recent: +4 `HIGH`; unmatched: +2 `MEDIUM`; old: +1 `MEDIUM` |
 | `TRACT` or `MIXED` | yes | `DEVELOPER_TRACT` | Development signal | 0 to +5 | vacant lot in a vacant subdivision: +4 `HIGH`; old lot in the patch: 0–1 `LOW` / `MEDIUM` |
 | `TRACT` | no | `MASS_CHANGE` | Government change | −1 to +3 | old: −1 `LOW`; vacant lot: +2 `MEDIUM` |
 | `MIXED` | no | `CITY_PROGRAM` | Government change | −1 to +3 | old: −1 `LOW`; vacant lot: +2 `MEDIUM` |
 | none (no coordinates) | none | `NO_COORDS` | none | −1 to +3 | mostly unmatched: 0 `LOW` |
 
-- **Score:** the sum of the points from steps 0–2, from −1 to +7. A needle whose patch has evidence can exceed +5, but that's rare.
+- **Score:** the sum of the points from steps 0–2, from −1 to +7. A needle whose patch has evidence can exceed +5: in the first MVP2 run (#29), 99 of 414 Maricopa AZ needles score +6 or +7.
 - **Tiers and use (for now):**
 
   | Tier | `growth_score` | Use |
@@ -313,7 +313,7 @@ One row per rezoning candidate, built in a temp table before the gates.
     ELSE 'MIXED'
   END
   ```
-- **Points:** `ISOLATED` +2. `TRACT` and `MIXED` score 0: a same-transition tract alone isn't a growth signal, since developers and governments both produce one, and patch evidence and `yb_status` already tell them apart. `TRACT` vs `MIXED` only picks the government-change label (`MASS_CHANGE` vs `CITY_PROGRAM`), so the 50% cutoff can't swing the score. That matters because the cutoff sits in the middle of the data: in Maricopa AZ, 522 of 2,890 non-isolated candidates have a same-transition share of 0.4–0.6. The 5% isolation cutoff has no such crowding: no candidate has a candidate share between 0.03 and 0.08.
+- **Points:** `ISOLATED` +2. `TRACT` and `MIXED` score 0: a same-transition tract alone isn't a growth signal, since developers and governments both produce one, and patch evidence and `yb_status` already tell them apart. `TRACT` vs `MIXED` only picks the government-change label (`MASS_CHANGE` vs `CITY_PROGRAM`), so the 50% cutoff can't swing the score. That matters because the cutoff sits in the middle of the data: in Maricopa AZ, 517 of 2,641 non-isolated candidates with coordinates have a same-transition share of 0.4–0.6 (first MVP2 run, #29). The 5% isolation cutoff does swing the score (+2), and it isn't in a gap either: 141 Maricopa AZ candidates have a candidate share between 0.03 and 0.08, 65 of them between 0.05 and 0.06. Review it in #31.
 
 #### Growth evidence `[MVP2]`
 - **What:** decide whether a non-isolated change looks like a developer project or a government change.
@@ -373,13 +373,13 @@ END
 
 - **Tiers:** `HIGH` if `growth_score ≥ score_high_min` (3); `MEDIUM` if `≥ score_medium_min` (1); else `LOW`. Range −1 to +7.
 - **Tier use (for now):** `HIGH` counts as a growth parcel; `MEDIUM` and `LOW` both go to review.
-- **Hand check on the labels (Maricopa AZ, approximate until #29 builds the features):**
+- **Hand check on the labels (Maricopa AZ; all six reproduce in the first MVP2 run, #29, diagnostic S6):**
   - the 4 Mesa false positives (`OLD`, `MIXED`): −1, `LOW`;
   - `AG` → `RSL30` tract (no year built, `TRACT`, owner and land evidence): +4, `HIGH`;
   - `RS35` → `PS` needle (built 2024, `ISOLATED`): +4, `HIGH`;
   - `LC` → `RSL30` (no year built, `MIXED`, owner and land evidence from the `RSL30` patch): +4, `HIGH`;
   - lots with no year built inside the Mesa `T4NF` remap: +2, `MEDIUM`;
-  - an isolated rezoning on an old structure (`OLD`, `ISOLATED`): +1, `MEDIUM`. An isolated change alone is a growth signal; old structures keep it out of `HIGH`.
+  - an isolated rezoning on an old structure (`OLD`, `ISOLATED`): +1, `MEDIUM`. An isolated change alone is a growth signal; old structures keep it out of `HIGH`. In the first run, 119 of 155 Maricopa AZ isolated `OLD` CLIPs score +1; the rest add a regulation move or patch evidence (+2 or +3).
 - The weight of `NO_YEAR_BUILT` (+2) assumes it means "no structure"; county-sourced year built has errors, so this weight is an open item. Weights live in one `CASE` block; the tier cutoffs are `DECLARE`s.
 
 #### Neighborhood choice
