@@ -74,7 +74,7 @@ flowchart TD
 | R8 | Noise classification | Code regime switch | The vendor or a jurisdiction swapped the whole zoning code | v2 | 62% of Orange (~267K CLIPs)<br/>*e.g. regulation "Orange Code 2050" → "Chapter 38 - ZONING", districts `T32` → `R1AC`* | • regulation name changed<br/>• ≥50% of the regulation's CLIPs changed district<br/>• ≥20 CLIPs in the regulation<br/>• **TBD:** handling for jurisdictions that aren't measurable |
 | R9 | Noise classification | Rename/merge crosswalk | Jurisdiction renamed or merged districts | v2/v6b | 51% of Gainesville (~18.5K CLIPs)<br/>*e.g. `RSF1`/`RSF2`/`RSF3`/`RSF4` → `SF`; split-zoned `PD\|RSF1` → `PD\|SF`* | • learned from single-district CLIPs per (county, regulation, district)<br/>• top target share ≥0.9<br/>• ≥20 CLIPs<br/>• map applied to each district in split-zoned sets *(drafted, not run)* |
 | R10 | Noise classification | Split-boundary handling | Split-zoned parcel lost a district (boundary noise) vs gained one (possible partial rezone) | v2/v6b | Split-boundary cases among needles: Orange 466 of 520, Maricopa 201 of 621, Gainesville 11 of 64<br/>*e.g. lost: `T43\|T52` → `T52`; gained: `CAN` → `CAN\|PD`* | • after set contained in before set (district lost) → `SLIVER_DROP` *(drafted, not run)*<br/>• before set contained in after set (district gained) → `is_partial_rezone` *(drafted, not run)*<br/>• **TBD:** gained district already on neighboring parcels → sliver (e.g. `RU43` → `RU190\|RU43`) |
-| R11 | Noise classification | City program | City-led remap into new districts | v6b | Mesa form-based remaps, total TBD<br/>*e.g. `DR2` → `T3N` (292), `RM2` → `T4N` (205), `DC` → `T6MS` (44)* | • target district new in CURR *(drafted, not run)*<br/>• or ≥4 source districts, ≥10 clusters (300 m), <50% from AG *(drafted, not run)*<br/>• **TBD:** run and tune thresholds |
+| R11 | Noise classification | City program | City-led remap that looks like scattered rezonings | v6b | MVP: 123 CLIPs (Maricopa AZ), 4 CLIPs (Alachua FL)<br/>*e.g. Mesa form-based code `DC` → `T6MS`* | • rezoning candidates only, grouped per target (`fips`, `curr_reg`, `curr_dset`)<br/>• new district: single district not in any PREV district set in the county; planned-development codes exempt<br/>• or ≥4 source district sets, ≥10 places (300 m), <50% from rural districts<br/>• **TBD:** misses compact remaps (Mesa transect districts) and flags scattered developer rezonings (Mesa `RM4`); redesign in #26 |
 | R12 | Spatial scoring | kNN isolation | Separate single-parcel rezonings from neighborhood-wide changes | v6 | Maricopa 621 / Gainesville 64 / Orange 520 needles<br/>*e.g. Maricopa `AG` → `LI`, Gainesville `BUS` → `U8`, Orange `CAN` → `PD`* | • 20 nearest sites within 1 km<br/>• co-located sites (condos) excluded<br/>• ≤15% share the same transition → `NEEDLE_PARCEL`<br/>• **TBD:** thresholds via QA |
 | R13 | Spatial scoring | Tract size | Developer tract vs mass change | v6 | Maricopa: 700 small-tract / 1,677 mass<br/>*e.g. tract: `AG` → `RSL30` (42); mass: `PAD` → `R14` (304)* | • ≤50 same-transition CLIPs within 1 km → `SMALL_TRACT`<br/>• else `MASS_CHANGE`<br/>• **TBD:** threshold via QA |
 | R14 | Enrichment | Annexation flag | County → city move, a developer signal | v6 | ~28 candidates (Maricopa 24, Orange 4)<br/>*e.g. regulation "Maricopa County Zoning Ordinance" → city code* | • `prev_reg ≠ curr_reg` outside R8<br/>• **TBD:** explicit county→city mapping |
@@ -166,11 +166,25 @@ flowchart TD
 
 ### R11. City program `[v6b]`
 - **What:** detect city-led remaps that look like scattered rezonings.
-- **Why:** Mesa's new form-based districts (`DR2 → T3N`, `RM2 → T4N`, `DC → T6MS`) showed up among the needles.
-- **Data columns:** `curr_dset`, `prev_dset`, `prev_use_class`, coordinates. Derived: `tgt_is_new_district`, `tgt_n_src`, `tgt_n_clusters`, `tgt_ag_src_share`.
-- **Algorithm:** `CITY_PROGRAM` if either:
-  - the target district didn't exist in PREV; or
-  - the target received rezonings from ≥ 4 source districts in ≥ 10 separate clusters (300 m apart), with less than 50% coming from AG or unzoned land.
+- **Why:** Mesa's form-based code moved old districts to transect districts across many blocks (`DR2 → T3N`, `RM2 → T4N`, `DC → T6MS`). A city program can touch a few lots here and there, so each lot looks isolated. R11 runs before R12 so that these are not labelled needles.
+- **Input:** rezoning candidates (`stage1 = 'CANDIDATE'`) after R10.
+- **Data columns:** `fips`, `curr_reg`, `curr_dset`, `prev_dset`, `geog`. Derived: `tgt_is_new_district`, `tgt_n_src`, `tgt_n_places`, `tgt_rural_src_share`, `is_city_program`.
+- **Algorithm:** a target is one (`fips`, `curr_reg`, `curr_dset`). Every candidate moving into a target is `CITY_PROGRAM` if either test passes:
+  - **New district** (`tgt_is_new_district`), all of:
+    - `curr_dset` is a single district (no `|`);
+    - it is not in any PREV district set in the county, across all regulations (`prev_universe`);
+    - it is not a planned-development code (`^(PD|PAD|PUD|PCD|PDD)`), because developers get new ones routinely.
+  - **Handed out widely**, all of:
+    - ≥ `prog_min_src` (4) distinct PREV district sets (`tgt_n_src`);
+    - ≥ `prog_min_places` (10) places (`tgt_n_places`): DBSCAN clusters with `eps` 300 m and `minPts` 1, so candidates within 300 m count as one place;
+    - < `prog_max_rural` (50%) of candidates have a rural district in their PREV set (`tgt_rural_src_share`, via `is_rural()`: `AG*`, `A<n>`, `AR`, `RA`, `RU<n>` e.g. `RU43`, `RURAL*`).
+  - Candidates without coordinates are left out of the "handed out widely" stats, but they still take their target's result.
+- **Diagnostics:** S5 (per-target stats and resulting change class) and S6 (sensitivity to `prog_min_places`) in `zoning_change_mvp.sql`.
+- **Known problems (#9, from S5 on Maricopa AZ):**
+  - False positive: Mesa `RM4` is the only target that passes "handed out widely" (17 places, 1.9 CLIPs per place, 18 owners for 34 CLIPs). Labelled true positives sit in it (`NC → RM4`, `RS43 → RM4`, `RM2 → RM4`), so these are separate developer rezonings.
+  - Misses: Mesa's transect districts (`T3N`, `T4N`, `T4NF`, `T4MS`, `T5MS`, `T5MSF`, `T5N`) existed in PREV and form only 1–5 places (17–140 CLIPs per place), so both tests fail. About 451 of their CLIPs land in `NEEDLE_PARCEL` / `SMALL_TRACT`. R12 doesn't catch them either: neighbours came from different source districts, so they don't share a transition.
+  - The thresholds are fixed counts that don't scale with county size, and the rural and planned-development code lists are based on Arizona and Florida codes.
+- **Next:** thresholds were left unchanged. #26 replaces R11–R13 with growth-signal gates (share of nearby changed parcels with the same transition, ownership, year built relative to PREV, super parcel) and a confidence score.
 
 ### R12. kNN isolation `[v6]`
 - **What:** check whether a candidate's neighbors made the same change.
