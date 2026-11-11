@@ -8,4 +8,5 @@ Finds parcel rezonings a developer probably pursued, separating them from vendor
 |---|---|
 | [`sql/zoning_change_mvp1.sql`](sql/zoning_change_mvp1.sql) | MVP1 (frozen): rules R1–R4, R6–R13; one row per changed CLIP with its change class, growth table flag, and parcel essentials attributes (`parcel_shape_id`, `owner_name`, `max_yr_built`) for QA |
 | [`sql/zoning_change_mvp1_parcels.sql`](sql/zoning_change_mvp1_parcels.sql) | Joins MVP1 output to parcel polygons for CARTO (carries `owner_name`, `max_yr_built`). Run after `zoning_change_mvp1.sql` |
+| [`sql/zoning_change_mvp2.sql`](sql/zoning_change_mvp2.sql) | MVP2 (active): R1–R4, R6–R10 copied from MVP1, then features, change pattern, growth evidence, change class and growth confidence score; one row per changed CLIP → `zoning_change_mvp2` |
 | [`sql/scratch/`](sql/scratch/) | Exploratory queries; not maintained |

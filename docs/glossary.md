@@ -103,7 +103,7 @@ The steps that replace R11–R13 in MVP2 (`zoning_mvp2.md`, "Growth signal (afte
 | **Patch owner** | The owner used for patch ownership: today's owner name. Owner as of PREV is a backlog item (#36). | | `owner_name` | MVP2 features |
 | **Top-owner share** | The share of a patch's CLIPs held by its most common patch owner. | | `patch_top_owner_share` | MVP2 features |
 | **Top super parcel share** | The share of a patch's CLIPs in its most common super parcel. | | `patch_top_sp_share` | MVP2 features |
-| **Year-built status** | A CLIP's year built relative to PREV: `NO_YEAR_BUILT` (matched, `max_yr_built` NULL), `RECENT` (≥ PREV year − `recent_yb_years`), `OLD`, or `UNMATCHED` (no parcel essentials row). `NO_YEAR_BUILT` is not the same as **Vacant**. | | `yb_status` | MVP2 features |
+| **Year-built status** | A CLIP's year built relative to PREV: `NO_YEAR_BUILT` (matched, `max_yr_built` NULL), `RECENT` (≥ PREV year − `recent_yb_years`), `OLD`, or `UNMATCHED` (no parcel or no parcel essentials row). `NO_YEAR_BUILT` is not the same as **Vacant**. | | `yb_status` | MVP2 features |
 | **Growth year-built share** | The share of a patch's matched CLIPs with `yb_status` `NO_YEAR_BUILT` or `RECENT`. | | `patch_growth_yb_share` | MVP2 features |
 | **Change pattern** | The shape of the change around a rezoning candidate: `ISOLATED` (low candidate share), `TRACT` (high same-transition share) or `MIXED`. | | `change_pattern` | MVP2 |
 | **Owner evidence** | A patch of 2+ CLIPs where one patch owner or one super parcel holds at least `owner_min_share`. | | `has_owner_evidence` | MVP2 growth evidence |
